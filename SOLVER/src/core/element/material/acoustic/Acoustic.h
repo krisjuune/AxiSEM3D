@@ -23,5 +23,7 @@ public:
 
     // check compatibility
     virtual void checkCompatibility(int Nr) const {}; 
-};
 
+    virtual RDMatPP getK1D() const {};
+    virtual RDMatXN getK3D() const {};
+};

@@ -101,6 +101,7 @@ void SolidFluidPoint::gatherStiffFromElement(const vec_CMatPP &stiff, int ipol, 
 
 void SolidFluidPoint::addToStiff(const CMatX3 &source) {
     mSolidPoint->addToStiff(source);
+    mFluidPoint->addToStiff(source);
 }
 
 void SolidFluidPoint::coupleSolidFluid() {

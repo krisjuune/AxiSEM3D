@@ -74,6 +74,10 @@ public:
     virtual const CMatX3 &getDispFourierSolid() const;
     virtual const CColX &getDispFourierFluid() const;
 
+    void setSourceMedium(bool IsFS) {mIsFS = IsFS;};
+
+    bool mIsFS;
+
 protected:
     
     // number of slices on ring

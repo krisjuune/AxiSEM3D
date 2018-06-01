@@ -20,8 +20,8 @@
 #include "Mesh.h"
 #include "Quad.h"
 
-ReceiverCollection::ReceiverCollection(const std::string &fileRec, bool geographic, 
-    double srcLat, double srcLon, double srcDep, int duplicated, bool saveSurf):
+ReceiverCollection::ReceiverCollection(const std::string &fileRec, bool geographic,
+    double srcLat, double srcLon, double srcDep, int duplicated, bool saveSurf, bool kmconv):
 mInputFile(fileRec), mGeographic(geographic), mSaveWholeSurface(saveSurf),
 mSrcLat(srcLat), mSrcLon(srcLon), mSrcDep(srcDep) {
     std::vector<std::string> name, network;
@@ -88,8 +88,8 @@ mSrcLat(srcLat), mSrcLon(srcLon), mSrcDep(srcDep) {
         }
         recKeys.push_back(key);
         // add receiver
-        mReceivers.push_back(new Receiver(name[i], network[i], 
-            theta[i], phi[i], geographic, depth[i], srcLat, srcLon, srcDep));
+        mReceivers.push_back(new Receiver(name[i], network[i],
+            theta[i], phi[i], geographic, depth[i], srcLat, srcLon, srcDep, kmconv));
         mWidthName = std::max(mWidthName, (int)name[i].length());
         mWidthNetwork = std::max(mWidthNetwork, (int)network[i].length());
     }
@@ -178,8 +178,8 @@ std::string ReceiverCollection::verbose() const {
     return ss.str();
 }
 
-void ReceiverCollection::buildInparam(ReceiverCollection *&rec, const Parameters &par, 
-    double srcLat, double srcLon, double srcDep, int totalStepsSTF, int verbose) {
+void ReceiverCollection::buildInparam(ReceiverCollection *&rec, const Parameters &par,
+    double srcLat, double srcLon, double srcDep, int totalStepsSTF, bool kmconv, int verbose) {
     if (rec) {
         delete rec;
     }
@@ -209,10 +209,10 @@ void ReceiverCollection::buildInparam(ReceiverCollection *&rec, const Parameters
             "Invalid parameter, keyword = OUT_STATIONS_DUPLICATED.");
     }
     bool saveSurf = par.getValue<bool>("OUT_STATIONS_WHOLE_SURFACE");
-    rec = new ReceiverCollection(recFile, geographic, srcLat, srcLon, srcDep, 
-        duplicated, saveSurf); 
-    
-    // options 
+    rec = new ReceiverCollection(recFile, geographic, srcLat, srcLon, srcDep,
+        duplicated, saveSurf, kmconv);
+
+    // options
     rec->mRecordInterval = par.getValue<int>("OUT_STATIONS_RECORD_INTERVAL");
     if (rec->mRecordInterval <= 0) {
         rec->mRecordInterval = 1;

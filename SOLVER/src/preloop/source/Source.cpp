@@ -14,6 +14,9 @@
 #include "XMPI.h"
 #include "MultilevelTimer.h"
 
+#include "Parameters.h"
+#include <boost/algorithm/string.hpp>
+
 Source::Source(double depth, double lat, double lon):
 mDepth(depth), mLatitude(lat), mLongitude(lon) {
     // handle singularity at poles
@@ -27,13 +30,13 @@ mDepth(depth), mLatitude(lat), mLongitude(lon) {
     }
 }
 
-void Source::release(Domain &domain, const Mesh &mesh) const {
+void Source::release(Domain &domain, const Mesh &mesh, const Parameters &par) const {
     MultilevelTimer::begin("Locate Source", 2);
     // locate local
     int myrank = XMPI::nproc();
     int locTag;
     RDColP interpFactZ;
-    if (locate(mesh, locTag, interpFactZ)) {
+    if (locate(mesh, locTag, interpFactZ, par)) {
         myrank = XMPI::rank();
     }
 
@@ -58,7 +61,7 @@ void Source::release(Domain &domain, const Mesh &mesh) const {
     MultilevelTimer::end("Compute Source", 2);
 }
 
-bool Source::locate(const Mesh &mesh, int &locTag, RDColP &interpFactZ) const {
+bool Source::locate(const Mesh &mesh, int &locTag, RDColP &interpFactZ, const Parameters &par) const {
     MultilevelTimer::begin("R Source", 3);
     RDCol2 srcCrds = RDCol2::Zero();
     srcCrds(1) = mesh.computeRadiusRef(mDepth, mLatitude, mLongitude);
@@ -71,13 +74,21 @@ bool Source::locate(const Mesh &mesh, int &locTag, RDColP &interpFactZ) const {
     if (srcCrds(1) > mesh.zMax() + tinySingle || srcCrds(1) < mesh.zMin() - tinySingle) {
         return false;
     }
+
+    std::string src_type = par.getValue<std::string>("SOURCE_TYPE");
+
     // find host element
     RDCol2 srcXiEta;
     for (int iloc = 0; iloc < mesh.getNumQuads(); iloc++) {
         const Quad *quad = mesh.getQuad(iloc);
-        if (!quad->isAxial() || quad->isFluid() || !quad->nearMe(srcCrds(0), srcCrds(1))) {
+        if (!quad->isAxial() || !quad->nearMe(srcCrds(0), srcCrds(1))) {
             continue;
         }
+
+        if(quad->isFluid() && !boost::iequals(src_type, "pressure_source")) {
+            throw std::runtime_error("Source::locate || Only pressure sources permitted inside fluid media.");
+        }
+
         if (quad->invMapping(srcCrds, srcXiEta)) {
             if (std::abs(srcXiEta(1)) <= 1.000001) {
                 if (std::abs(srcXiEta(0) + 1.) > tinySingle) {
@@ -93,12 +104,11 @@ bool Source::locate(const Mesh &mesh, int &locTag, RDColP &interpFactZ) const {
     return false;
 }
 
-#include "Parameters.h"
 #include "Earthquake.h"
 #include "PointForce.h"
+#include "PressureSource.h"
 #include "NullSource.h"
 #include <fstream>
-#include <boost/algorithm/string.hpp>
 #include <cfloat>
 
 void Source::parseLine(const std::string &line, const std::string &key, double &res) {
@@ -224,6 +234,40 @@ void Source::buildInparam(Source *&src, const Parameters &par, int verbose) {
         XMPI::bcast(f2);
         XMPI::bcast(f3);
         src = new PointForce(depth, lat, lon, f1, f2, f3);
+      } else if (boost::iequals(src_type, "pressure_source")) {
+          // point force
+          std::string pressuresfile = Parameters::sInputDirectory + "/" + src_file;
+          double depth = DBL_MAX, lat = DBL_MAX, lon = DBL_MAX;
+          double p0 = DBL_MAX, V = DBL_MAX, M0 = DBL_MAX;
+          if (XMPI::root()) {
+              std::fstream fs(pressuresfile, std::fstream::in);
+              if (!fs) {
+                  throw std::runtime_error("Source::buildInparam || "
+                      "Error opening point force data file: ||" + pressuresfile);
+              }
+              std::string line;
+              while (std::getline(fs, line)) {
+                  parseLine(line, "latitude", lat);
+                  parseLine(line, "longitude", lon);
+                  parseLine(line, "depth", depth);
+                  parseLine(line, "pressure", p0);
+                  parseLine(line, "injector_vol", V);
+              }
+              checkValue("latitude", lat);
+              checkValue("longitude", lon);
+              checkValue("depth", depth);
+              checkValue("pressure", p0);
+              checkValue("injector_vol", V);
+              // unit
+              M0 = 0.1 * p0 * V;
+              depth *= 1e3;
+              fs.close();
+          }
+          XMPI::bcast(depth);
+          XMPI::bcast(lat);
+          XMPI::bcast(lon);
+          XMPI::bcast(M0);
+          src = new PressureSource(depth, lat, lon, M0);
     } else {
         throw std::runtime_error("Source::buildInparam || Unknown source type: " + src_type);
     }

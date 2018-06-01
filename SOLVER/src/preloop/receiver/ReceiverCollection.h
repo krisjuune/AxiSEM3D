@@ -15,18 +15,19 @@ class PointwiseIO;
 
 class ReceiverCollection {
 public:
-    ReceiverCollection(const std::string &fileRec, bool geographic, 
-        double srcLat, double srcLon, double srcDep, int duplicated, 
-        bool saveSurf);
+    ReceiverCollection(const std::string &fileRec, bool geographic,
+        double srcLat, double srcLon, double srcDep, int duplicated,
+        bool saveSurf, bool kmconv);
     ~ReceiverCollection();
     
     void release(Domain &domain, const Mesh &mesh); 
     
     std::string verbose() const;
     
-    static void buildInparam(ReceiverCollection *&rec, const Parameters &par, 
-        double srcLat, double srcLon, double srcDep, int totalStepsSTF, int verbose);
         
+    static void buildInparam(ReceiverCollection *&rec, const Parameters &par,
+        double srcLat, double srcLon, double srcDep, int totalStepsSTF,
+        bool kmconv, int verbose);
 private:
     
     // receivers

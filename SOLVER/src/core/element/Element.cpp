@@ -4,7 +4,10 @@
 
 #include "Element.h"
 #include "Point.h"
+#include "Acoustic.h"
 
+#include "FieldFFT.h"
+#include "SolverFFTW_N.h"
 #include "Gradient.h"
 #include "PRT.h"
 
@@ -29,8 +32,42 @@ Element::~Element() {
 }
 
 void Element::addSourceTerm(const arPP_CMatX3 &source) const {
+    arPP_CMatX3 SF_source = source;
+    if (fluid()) {
+        Acoustic *acoust = getAcoustic();
+        if (acoust->is1D()) {
+            RMatPP K = acoust->getK1D();
+            for (int ipol = 0; ipol <= nPol; ipol++) {
+                for (int jpol = 0; jpol <= nPol; jpol++) {
+                    int ipnt = ipol * nPntEdge + jpol;
+                    std::complex<double> Kc = {K(ipol,jpol),0};
+                    for (int i = 0; i < 3; i++) {
+                        for (int alpha = 0; alpha < SF_source[ipnt].rows(); alpha++) {
+                            SF_source[ipnt](alpha, i) = SF_source[ipnt](alpha, i) * Kc;
+                        }
+                    }
+                }
+            }
+        } else {
+            RMatXN &K = SolverFFTW_N::getR2C_RMat(mMaxNr);
+            vec_CMatPP KF;
+            K = acoust->getK3D();
+            FieldFFT::transformP2F(KF, mMaxNr);
+            for (int ipol = 0; ipol <= nPol; ipol++) {
+                for (int jpol = 0; jpol <= nPol; jpol++) {
+                    int ipnt = ipol * nPntEdge + jpol;
+                    for (int i = 0; i < 3; i++) {
+                        for (int alpha = 0; alpha < SF_source[ipnt].rows(); alpha++) {
+                            SF_source[ipnt](alpha, i) = SF_source[ipnt](alpha, i) * KF[alpha](ipol,jpol);
+                        }
+                    }
+                }
+            }
+        }
+    }
     for (int i = 0; i < nPntElem; i++) {
-        mPoints[i]->addToStiff(source[i]);
+        mPoints[i]->addToStiff(SF_source[i]);
+        mPoints[i]->setSourceMedium(fluid());
     }
 }
 

@@ -6,6 +6,8 @@
 #include "Quad.h"
 #include "ExodusModel.h"
 
+#include "ABCParameters.h"
+
 #include "SphericalMapping.h"
 #include "LinearMapping.h"
 #include "SemiSphericalMapping.h"
@@ -171,6 +173,15 @@ mQuadTag(quadTag) {
             mOceanDepth[ipnt] = RDColX::Zero(mPointNr(ipol, jpol));    
         }
     }
+
+    // absorbing boundaries
+    mIsABQuad = exModel.isABQuad(quadTag);
+    if (exModel.isIsotropic()) {
+        mVref = exModel.getElementalVariables("VP_0", quadTag);
+    } else {
+        mVref = (exModel.getElementalVariables("VPV_0", quadTag) + exModel.getElementalVariables("VPH_0", quadTag)) / 2;
+    }
+
 }
 
 Quad::~Quad() {
@@ -193,6 +204,9 @@ void Quad::setOceanLoad3D(const OceanLoad3D &o3D,
     double srcLat, double srcLon, double srcDep, double phi2D) {
     if (!mOnSurface) {
         return;
+    }
+    if (mIsFluid) {
+        throw std::runtime_error("Quad::setOceanLoad3D || Adding ocean load to fluid surface.");
     }
     for (int ipol = 0; ipol <= nPol; ipol++) {
         for (int jpol = 0; jpol <= nPol; jpol++) {
@@ -252,9 +266,20 @@ double Quad::getDeltaT() const {
     // return (dt_min_org + dt_min_all) / 2.;
 }
 
-void Quad::setupGLLPoints(std::vector<GLLPoint *> &gllPoints, const IMatPP &myPointTags, double distTol) {
+void Quad::setupGLLPoints(std::vector<GLLPoint *> &gllPoints, const IMatPP &myPointTags,
+    double distTol, RDCol2 &Vref_range, RDCol2 &U0_range, const ABCParameters *ABCPar) {
     // compute mass on points
     const arPP_RDColX &mass = mMaterial->computeElementalMass();
+    Eigen::Matrix<RDCol2, 2, 2> H;
+
+    double U0 = ABCPar->Ufac * mVref / (2 * ABCPar->Hmax);
+
+    if (mIsABQuad == 1) {
+                Vref_range[0]=std::min({Vref_range[0], mVref});
+                Vref_range[1]=std::max({Vref_range[1], mVref});
+                U0_range[0]=std::min({U0_range[0], U0});
+                U0_range[1]=std::max({U0_range[1], U0});
+    }
 
     for (int ipol = 0; ipol <= nPol; ipol++) {
         for (int jpol = 0; jpol <= nPol; jpol++) {
@@ -301,6 +326,16 @@ void Quad::setupGLLPoints(std::vector<GLLPoint *> &gllPoints, const IMatPP &myPo
                 const RDMatX3 &normal = computeNormal(mSurfaceSide, ipol, jpol);
                 gllPoints[pointTag]->addSurfNormal(normal);
                 gllPoints[pointTag]->setOceanDepth(mOceanDepth[ipnt]);    
+            }
+
+            if (mIsABQuad == 1) {
+                double z_dist = (ABCPar->boundaries[0] - crds[0]) * (ABCPar->boundaries[0] - crds[0]);
+                double s_dist = (ABCPar->boundaries[1] - crds[1]) * (ABCPar->boundaries[1] - crds[1]);
+                double dist = std::sqrt(std::min({s_dist,z_dist}));
+
+                double gamma = U0 * (1 - sin(pi * dist / (2 * ABCPar->width)) * sin(pi * dist / (2 * ABCPar->width)));
+
+                gllPoints[pointTag]->addGamma(gamma);
             }
         }
     }

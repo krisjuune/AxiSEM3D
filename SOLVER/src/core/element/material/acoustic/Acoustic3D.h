@@ -24,6 +24,8 @@ public:
     // check compatibility
     void checkCompatibility(int Nr) const;
 
+    RMatXN getK3D() const {return mKFlat;}
+
 private:
     RMatXN mKFlat;
 };

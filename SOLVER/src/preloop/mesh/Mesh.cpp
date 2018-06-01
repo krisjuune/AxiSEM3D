@@ -20,6 +20,8 @@
 #include "NuWisdom.h"
 #include "NrField.h"
 
+#include "ABCParameters.h"
+
 #include "MultilevelTimer.h"
 #include "SlicePlot.h"
 #include <fstream>
@@ -29,6 +31,7 @@ Mesh::~Mesh() {
     destroy(); // local build
     delete mDDPar;
     delete mLearnPar;
+    delete mABCPar;
     for (const auto &sp: mSlicePlots) {
         delete sp;
     }    
@@ -42,7 +45,10 @@ mExModel(exModel), mNrField(nrf), mSrcLat(srcLat), mSrcLon(srcLon), mSrcDep(srcD
     mOceanLoad3D = 0;
     mDDPar = new DDParameters(par);
     mLearnPar = new LearnParameters(par);
-    
+    mABCPar = new ABCParameters(par,mExModel);
+    mU0_range = {100000,0};
+    mVref_range = {100000,0};
+
     // 2D mode
     std::string mode2d = par.getValue<std::string>("MODEL_2D_MODE");
     if (boost::iequals(mode2d, "off")) {
@@ -283,8 +289,8 @@ void Mesh::buildLocal(const DecomposeOption &option) {
     // setup GLL points
     MultilevelTimer::begin("Setup Points", 2);
     for (int iloc = 0; iloc < mLocalElemToGLL.size(); iloc++) {
-        mQuads[iloc]->setupGLLPoints(mGLLPoints, mLocalElemToGLL[iloc], mExModel->getDistTolerance());
-    } 
+        mQuads[iloc]->setupGLLPoints(mGLLPoints, mLocalElemToGLL[iloc], mExModel->getDistTolerance(), mVref_range, mU0_range, mABCPar);
+    }
     MultilevelTimer::end("Setup Points", 2);
     
     /////////////////////////////// assemble mass and normal ///////////////////////////////
@@ -543,6 +549,23 @@ void Mesh::test() {
     Domain domain;
     release(domain);
     domain.test();
+}
+
+std::string Mesh::ABC_verbose() const {
+    std::stringstream ss;
+    ss << "\n=================== Absorbing Boundaries ===================" << std::endl;
+    if (mExModel->hasABC()) {
+        ss << "  Number of Nodes      =   " << mABCPar->n << std::endl;
+        ss << "  Att. Multiplier      =   " << mABCPar->Ufac << std::endl;
+        ss << std::endl;
+        ss << "  Boundary Width       =   " << mABCPar->width << std::endl;
+        ss << "  Reference Velocities =   " << mVref_range[0] << " ... " << mVref_range[1] << std::endl;
+        ss << "  Max. Attenuations    =   " << mU0_range[0] << " ... " << mU0_range[1] << std::endl;
+    } else {
+        ss << "  Absorbing boundaries are turned off." << std::endl;
+    }
+    ss << "=================== Absorbing Boundaries ===================\n" << std::endl;
+    return ss.str();
 }
 
 Mesh::DDParameters::DDParameters(const Parameters &par) {

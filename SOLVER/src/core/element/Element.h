@@ -7,6 +7,7 @@
 class Point;
 class Gradient;
 class PRT;
+class Acoustic;
 
 #include "eigenc.h"
 #include "eigenp.h"
@@ -51,6 +52,14 @@ public:
     // axial
     bool axial() const;
     
+    virtual bool fluid() const {
+        throw std::runtime_error("Element::fluid || Error.");
+    };
+
+    virtual Acoustic * getAcoustic() const {
+        throw std::runtime_error("Element::getAcoustic || Error.");
+    };
+
     // form theta for TIso
     RDMatPP formThetaMat() const;
     

@@ -110,8 +110,16 @@ int axisem_main(int argc, char *argv[]) {
         // pl.mMesh->test();
         // XMPI::barrier();
         // exit(0);
-        
-        //////// source time function 
+
+        //////// output ABC Parameters
+        std::string s = pl.mMesh->ABC_verbose();
+        std::ofstream outABC;
+        outABC.open(Parameters::sOutputDirectory + "/ABCparams.txt");
+        outABC.write(s.c_str(),s.length());
+        XMPI::cout << pl.mMesh->ABC_verbose();
+
+
+        //////// source time function
         MultilevelTimer::begin("Build Source Time Function", 0);
         STF::buildInparam(pl.mSTF, *(pl.mParameters), dt, verbose);
         MultilevelTimer::end("Build Source Time Function", 0);
@@ -133,7 +141,7 @@ int axisem_main(int argc, char *argv[]) {
         
         // release source 
         MultilevelTimer::begin("Release Source", 1);
-        pl.mSource->release(*(sv.mDomain), *(pl.mMesh));
+        pl.mSource->release(*(sv.mDomain), *(pl.mMesh), *(pl.mParameters));
         MultilevelTimer::end("Release Source", 1);
         
         // release stf 
@@ -207,6 +215,7 @@ int axisem_main(int argc, char *argv[]) {
 #include "SolverFFTW.h"
 #include "SolverFFTW_1.h"
 #include "SolverFFTW_3.h"
+#include "SolverFFTW_N.h"
 #include "SolverFFTW_N3.h"
 #include "SolverFFTW_N6.h"
 #include "SolverFFTW_N9.h"
@@ -219,6 +228,7 @@ extern void initializeSolverStatic(int maxNr, bool disableWisdomFFTW) {
     SolverFFTW::importWisdom(disableWisdomFFTW);
     SolverFFTW_1::initialize(maxNr);
     SolverFFTW_3::initialize(maxNr); 
+    SolverFFTW_N::initialize(maxNr);
     SolverFFTW_N3::initialize(maxNr);
     SolverFFTW_N6::initialize(maxNr);
     SolverFFTW_N9::initialize(maxNr);
@@ -233,6 +243,7 @@ extern void finalizeSolverStatic() {
     // fftw
     SolverFFTW_1::finalize();
     SolverFFTW_3::finalize(); 
+    SolverFFTW_N::finalize();
     SolverFFTW_N3::finalize();
     SolverFFTW_N6::finalize();
     SolverFFTW_N9::finalize();

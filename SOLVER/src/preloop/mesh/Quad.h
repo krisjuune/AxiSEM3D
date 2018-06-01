@@ -22,6 +22,7 @@ class Gradient;
 class Relabelling;
 class Material;
 class AttBuilder;
+class ABCParameters;
 
 class Domain;
 
@@ -46,9 +47,10 @@ public:
     double getDeltaT() const;
     
     // setup gll points 
-    void setupGLLPoints(std::vector<GLLPoint *> &gllPoints, 
-        const IMatPP &myPointTags, double distTol);
     
+    void setupGLLPoints(std::vector<GLLPoint *> &gllPoints, const IMatPP &myPointTags,
+        double distTol, RDCol2 &Vref_range, RDCol2 &U0_range, const ABCParameters *ABCPar);
+
     // create elements and push to domain
     int release(Domain &domain, const IMatPP &myPointTags, 
         const AttBuilder *attBuild) const;
@@ -136,10 +138,11 @@ protected:
     // solid or fluid
     bool mIsFluid;
     
-    // axial, sf, surface boundaries
+    // axial, sf, surface boundaries, absorbing boundaries
     bool mIsAxial, mOnSFBoundary, mOnSurface;
-    int mAxialSide, mSFSide, mSurfaceSide;
-    
+    int mAxialSide, mSFSide, mSurfaceSide, mIsABQuad;
+    double mVref;
+
     ////////////////////////////////////////////////// GLL level
     // dt of Quad, nPol = 1
     double mDeltaTRef;

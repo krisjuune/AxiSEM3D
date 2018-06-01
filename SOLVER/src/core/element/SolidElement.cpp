@@ -300,6 +300,8 @@ void SolidElement::displToStiff() const {
     
 }
 
+bool SolidElement::fluid() const {return false;}
+
 //-------------------------- static --------------------------//
 SolidResponse SolidElement::sResponse;
 void SolidElement::initWorkspace(int maxMaxNu) {

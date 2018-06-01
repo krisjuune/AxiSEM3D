@@ -9,6 +9,7 @@
 #include "Acoustic.h"
 #include "CrdTransTIsoFluid.h"
 #include "FieldFFT.h"
+#include "SolverFFTW_N3.h"
 
 #include "MultilevelTimer.h"
 
@@ -161,8 +162,65 @@ void FluidElement::test() const {
 }
 
 void FluidElement::computeGroundMotion(Real phi, const RMatPP &weights, RRow3 &u_spz) const {
-    throw std::runtime_error("FluidElement::computeGroundMotion || "
-        "Not implemented."); 
+    // get displ from points
+    int ipnt = 0;
+    for (int ipol = 0; ipol <= nPol; ipol++) {
+        for (int jpol = 0; jpol <= nPol; jpol++) {
+            mPoints[ipnt++]->scatterDisplToElement(sResponse.mDispl, ipol, jpol, mMaxNu);
+        }
+    }
+
+    vec_ar3_CMatPP FluidDisp = vec_ar3_CMatPP(mMaxNu + 1, zero_ar3_CMatPP);
+    RMatXN3 &FluidDisp_r = SolverFFTW_N3::getR2C_RMat(mMaxNr);
+
+    mGradient->computeGrad(sResponse.mDispl, FluidDisp, mMaxNu, sResponse.mNyquist);
+    FieldFFT::transformF2P(FluidDisp, mMaxNr);
+    FluidDisp_r = SolverFFTW_N3::getC2R_RMat(mMaxNr);
+
+    if (mAcoustic->is1D()) {
+        RMatPP K = mAcoustic->getK1D();
+        for (int alpha = 0; alpha <= mMaxNu; alpha++) {
+            for (int i = 0; i < 3; i++) {
+                for (int ipol = 0; ipol <= nPol; ipol++) {
+                    for (int jpol = 0; jpol <= nPol; jpol++) {
+                        int ipnt = ipol * nPntEdge + jpol;
+                        FluidDisp_r(alpha, i * nPE + ipnt) *= K(ipol,jpol);
+                    }
+                }
+            }
+        }
+    } else {
+        RMatXN K = mAcoustic->getK3D();
+        for (int alpha = 0; alpha <= mMaxNu; alpha++) {
+            for (int i = 0; i < 3; i++) {
+                for (int ipnt = 0; ipnt < nPE; ipnt++) {
+                    FluidDisp_r(alpha, i * nPE + ipnt) *= K(alpha,ipnt);
+                }
+            }
+        }
+    }
+    FieldFFT::transformP2F(FluidDisp, mMaxNr);
+
+    // compute ground motion pointwise
+    u_spz.setZero();
+    for (int ipol = 0; ipol <= nPol; ipol++) {
+        for (int jpol = 0; jpol <= nPol; jpol++) {
+            if (std::abs(weights(ipol, jpol)) < tinyDouble) continue;
+            Real up0 = FluidDisp[0][0](ipol, jpol).real();
+            Real up1 = FluidDisp[0][1](ipol, jpol).real();
+            Real up2 = FluidDisp[0][2](ipol, jpol).real();
+            for (int alpha = 1; alpha <= mMaxNu - (int)(mMaxNr % 2 == 0); alpha++) {
+                Complex expval = two * exp((Real)alpha * phi * ii);
+                up0 += (expval * FluidDisp[alpha][0](ipol, jpol)).real();
+                up1 += (expval * FluidDisp[alpha][1](ipol, jpol)).real();
+                up2 += (expval * FluidDisp[alpha][2](ipol, jpol)).real();
+            }
+
+            u_spz(0) += weights(ipol, jpol) * up0;
+            u_spz(1) += weights(ipol, jpol) * up1;
+            u_spz(2) += weights(ipol, jpol) * up2;
+        }
+    }
 }
 
 void FluidElement::feedDispOnSide(int side, CMatXX_RM &buffer, int row) const {
@@ -201,6 +259,8 @@ void FluidElement::displToStiff() const {
     }
     mGradient->computeQuad(sResponse.mStiff, sResponse.mStress, sResponse.mNu, sResponse.mNyquist);
 }
+
+bool FluidElement::fluid() const {return true;}
 
 //-------------------------- static --------------------------//
 FluidResponse FluidElement::sResponse;

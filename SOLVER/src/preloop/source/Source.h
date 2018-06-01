@@ -19,8 +19,8 @@ public:
     
     virtual ~Source() {};
     
-    void release(Domain &domain, const Mesh &mesh) const;
     
+    void release(Domain &domain, const Mesh &mesh, const Parameters &par) const;
     virtual std::string verbose() const = 0;
         
     double getLatitude() const {return mLatitude;};
@@ -40,6 +40,6 @@ protected:
     double mLongitude;
         
 private:
-    bool locate(const Mesh &mesh, int &locTag, RDColP &interpFactZ) const;
+    bool locate(const Mesh &mesh, int &locTag, RDColP &interpFactZ, const Parameters &par) const;
 };
 

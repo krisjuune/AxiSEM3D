@@ -21,6 +21,8 @@ public:
     // 1D or Fourier space
     bool is1D() const {return true;};
     
+    RMatPP getK1D() const {return mKStruct;}
+
 private:
     RMatPP mKStruct; 
 };

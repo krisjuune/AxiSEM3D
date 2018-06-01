@@ -26,10 +26,20 @@ public:
     bool hasAttenuation() const {return mGlobalVariables.find("nr_lin_solids") != mGlobalVariables.end();};
     int getNumQuads() const {return mConnectivity.rows();};
     int getNumNodes() const {return mNodalS.rows();};
-    double getROuter() const {return mGlobalVariables.at("radius");};
+    double getROuter() const {
+      try {
+        return mGlobalVariables.at("radius");
+      } catch (...) {return 6371000.0;}
+    };
     bool isCartesian() const {return mGlobalRecords.at("crdsys") != "spherical";};
+    bool hasABC() const {return (isCartesian() && mN_ABC > 0);}
     double getDistTolerance() const {return mDistTolerance;};
-    
+    double getHmax() const {return mHmax;};
+    RDCol2 getBoundaries() const {
+      RDCol2 b(mNodalS.maxCoeff(),mNodalZ.minCoeff());
+      return b;
+    }
+
     // Node-wise
     double getNodalS(int nodeTag) const {return mNodalS(nodeTag);};
     double getNodalZ(int nodeTag) const {return mNodalZ(nodeTag);};
@@ -41,6 +51,8 @@ public:
     };
     int getSideAxis(int quadTag) const {return mSideSets.at(mSSNameAxis)(quadTag);};
     int getSideSurface(int quadTag) const {return mSideSets.at(mSSNameSurface)(quadTag);};
+    int getSideRightB(int quadTag) const {return mSideSets.at(mSSNameRightB)(quadTag);};
+    int getSideLowerB(int quadTag) const {return mSideSets.at(mSSNameLowerB)(quadTag);};
     int getSideSolidFluid(int quadTag) const {
         if (mSideSets.find("solid_fluid_boundary") != mSideSets.end()) {
             return mSideSets.at("solid_fluid_boundary")(quadTag);
@@ -50,7 +62,8 @@ public:
     const IMatX4 &getConnectivity() const {return mConnectivity;};
     IRow4 getConnectivity(int quadTag) const {return mConnectivity.row(quadTag);};
     IRow4 getVicinalAxis(int quadTag) const {return mVicinalAxis.row(quadTag);};
-    
+    int isABQuad(int quadTag) const {return mABfield[quadTag](0);};
+
     std::string verbose() const;
     
     static void buildInparam(ExodusModel *&exModel, const Parameters &par, 
@@ -62,7 +75,8 @@ private:
     void bcastRawData();
     void formStructured();
     void formAuxiliary();
-    
+    void AddAbsorbingBoundaryElements();
+
     // file name
     std::string mExodusFileName;
 
@@ -104,12 +118,18 @@ private:
     
     std::string mSSNameAxis = "t0";
     std::string mSSNameSurface = "r1";
-    
+    std::string mSSNameRightB = "t1";
+    std::string mSSNameLowerB = "r0";
+
     ///////////////////////////////////// auxiliary /////////////////////////////////////
     // for Nr map
     RDColX mAveGLLSpacing;
     IMatX4 mVicinalAxis; 
     double mDistTolerance;
+
+    // for ABCs
+    double mHmax, mVp_min;
+    int mN_ABC;
+    int mNumQuadsInner, mNumNodesInner;
+    std::vector<IRow2> mABfield;
 };
-
-

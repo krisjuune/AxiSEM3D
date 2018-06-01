@@ -57,6 +57,8 @@ public:
     // verbose
     std::string verbose() const;
     
+    bool fluid() const;
+
 private:
     
     // displ ==> stiff

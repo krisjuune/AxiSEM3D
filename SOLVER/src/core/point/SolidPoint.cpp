@@ -6,8 +6,8 @@
 #include "Mass.h"
 #include "MultilevelTimer.h"
 
-SolidPoint::SolidPoint(int nr, bool axial, const RDCol2 &crds, Mass *mass):
-Point(nr, axial, crds), mMass(mass) {
+SolidPoint::SolidPoint(int nr, bool axial, const RDCol2 &crds, Mass *mass, const double gamma):
+Point(nr, axial, crds), mMass(mass), mGamma(gamma) {
     mDispl = CMatX3::Zero(mNu + 1, 3);
     mVeloc = CMatX3::Zero(mNu + 1, 3);
     mAccel = CMatX3::Zero(mNu + 1, 3);
@@ -21,18 +21,25 @@ SolidPoint::~SolidPoint() {
 }
 
 void SolidPoint::updateNewmark(Real dt) {
-    // mask stiff 
+    // calculate new acceleration
+      // mask stiff
     maskField(mStiff);
-    // compute accel inplace
+      // compute accel inplace
     mMass->computeAccel(mStiff);
-    // mask accel (masking must be called twice if mass is 3D)
+      // mask accel (masking must be called twice if mass is 3D)
     maskField(mStiff);
     // update dt
     Real half_dt = half * dt;
     Real half_dt_dt = half_dt * dt;
+    // update velocity and old acceleration
     mVeloc += half_dt * (mAccel + mStiff);
     mAccel = mStiff;
-    mDispl += dt * mVeloc + half_dt_dt * mAccel;  
+    // update displacement
+    mDispl += dt * mVeloc + half_dt_dt * mAccel;
+
+    // absorbing boundaries
+    mAccel -= 2 * mGamma * mVeloc + mGamma * mGamma * mDispl;
+
     // zero stiffness for next time step
     mStiff.setZero();
 }

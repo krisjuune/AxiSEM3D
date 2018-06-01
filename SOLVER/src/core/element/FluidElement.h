@@ -56,6 +56,10 @@ public:
     // verbose
     std::string verbose() const;
     
+    bool fluid() const;
+
+    Acoustic * getAcoustic() const {return mAcoustic;};
+
 private:
     
     // displ ==> stiff

@@ -10,8 +10,8 @@ class Mass;
 class SolidPoint: public Point {
     friend class SolidFluidPoint;
     
-public:    
-    SolidPoint(int nr, bool axial, const RDCol2 &crds, Mass *mass);
+public:
+    SolidPoint(int nr, bool axial, const RDCol2 &crds, Mass *mass, const double gamma);
     ~SolidPoint();
     
     // update in time domain by Newmark
@@ -74,6 +74,9 @@ private:
     // mass
     Mass *mMass;
     
+    // ABC factor
+    double mGamma;
+
     // max disp norm for wisddom learning
     RRow3 mMaxDisplWisdom = -RRow3::Ones();
     Eigen::Matrix<int, 1, 3> mNuWisdom = Eigen::Matrix<int, 1, 3>::Zero();

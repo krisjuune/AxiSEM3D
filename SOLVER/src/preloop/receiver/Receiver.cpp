@@ -16,9 +16,10 @@
 #include <iomanip>
 #include "XMPI.h"
 
-Receiver::Receiver(const std::string &name, const std::string &network, 
-    double theta_lat, double phi_lon, bool geographic, 
-    double depth, double srcLat, double srcLon, double srcDep):
+Receiver::Receiver(const std::string &name, const std::string &network,
+    double theta_lat, double phi_lon, bool geographic,
+    double depth, double srcLat, double srcLon, double srcDep,
+    bool kmconv):
 mName(name), mNetwork(network), mDepth(depth) {
     RDCol3 rtpG, rtpS;
     if (geographic) {
@@ -28,7 +29,11 @@ mName(name), mNetwork(network), mDepth(depth) {
         rtpS = Geodesy::rotateGlob2Src(rtpG, srcLat, srcLon, srcDep);
     } else {
         rtpS(0) = 1.;
-        rtpS(1) = theta_lat * degree;
+        if (kmconv) {
+          rtpS(1) = theta_lat * 1000 / Geodesy::getROuter();
+        } else {
+          rtpS(1) = theta_lat * degree;
+        }
         rtpS(2) = phi_lon * degree;
         rtpG = Geodesy::rotateSrc2Glob(rtpS, srcLat, srcLon, srcDep);
     }

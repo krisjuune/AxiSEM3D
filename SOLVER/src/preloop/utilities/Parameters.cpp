@@ -38,7 +38,9 @@ void Parameters::registerAll() {
     registerPar("MODEL_PLOT_SLICES_NUM");
     registerPar("MODEL_PLOT_SLICES_LIST");
     registerPar("ATTENUATION");
-    
+    registerPar("ABC_ELEMENTS");
+    registerPar("ABC_FACTOR");
+
     // inparam.nu
     registerPar("NU_TYPE");
     registerPar("NU_CONST");

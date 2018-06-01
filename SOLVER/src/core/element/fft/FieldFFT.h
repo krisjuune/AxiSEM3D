@@ -9,10 +9,12 @@
 class FieldFFT {
 public:
     
+    static void transformF2P(const vec_CMatPP &uc, int Nr);
     static void transformF2P(const vec_ar3_CMatPP &uc, int Nr);
     static void transformF2P(const vec_ar6_CMatPP &uc, int Nr);
     static void transformF2P(const vec_ar9_CMatPP &uc, int Nr);
     
+    static void transformP2F(vec_CMatPP &uc, int Nr);
     static void transformP2F(vec_ar3_CMatPP &uc, int Nr);
     static void transformP2F(vec_ar6_CMatPP &uc, int Nr);
     static void transformP2F(vec_ar9_CMatPP &uc, int Nr);

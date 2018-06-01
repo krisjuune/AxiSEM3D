@@ -10,8 +10,8 @@ class Mass;
 class FluidPoint: public Point {
     friend class SolidFluidPoint;
 
-public:    
-    FluidPoint(int nr, bool axial, const RDCol2 &crds, Mass *mass);
+public:
+    FluidPoint(int nr, bool axial, const RDCol2 &crds, Mass *mass, const double gamma);
     ~FluidPoint();
 
     // update in time domain by Newmark
@@ -50,6 +50,9 @@ public:
     // gather stiff from element
     void gatherStiffFromElement(const vec_CMatPP &stiff, int ipol, int jpol);
     
+    // add to stiff, used by source
+    void addToStiff(const CMatX3 &source);
+
     // wisdom
     void learnWisdom(Real cutoff);
     int getNuWisdom() const {return mNuWisdom;};
@@ -71,6 +74,9 @@ private:
     // mass
     Mass *mMass;
     
+    // ABC factor
+    double mGamma;
+
     // wisdom
     Real mMaxDisplWisdom = -1.;
     int mNuWisdom = 0;

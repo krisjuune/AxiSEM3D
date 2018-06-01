@@ -42,6 +42,7 @@ void GLLPoint::setup(int nr, bool axial, bool surface, const RDCol2 &crds, doubl
         mOceanDepth = RDColX::Zero(mNr);
         mSurfNormal = RDMatX3::Zero(mNr, 3);
         mReferenceCount = 1;
+        mGamma = 0;
     }
 }
 
@@ -78,7 +79,7 @@ int GLLPoint::release(Domain &domain) const {
                 mass = new Mass3D(invMass.cast<Real>());
             }
         }
-        solid = new SolidPoint(mNr, mIsAxial, mCoords, mass);
+        solid = new SolidPoint(mNr, mIsAxial, mCoords, mass, mGamma);
     }
     
     // fluid point ptr
@@ -91,7 +92,7 @@ int GLLPoint::release(Domain &domain) const {
             const RDColX &invMass = mMassFluid.array().pow(-1.).matrix(); 
             mass = new Mass3D(invMass.cast<Real>());
         }
-        fluid = new FluidPoint(mNr, mIsAxial, mCoords, mass);
+        fluid = new FluidPoint(mNr, mIsAxial, mCoords, mass, mGamma);
     }
     
     // released as different point classes

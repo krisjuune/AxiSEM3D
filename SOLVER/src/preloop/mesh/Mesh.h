@@ -22,6 +22,7 @@ struct DecomposeOption;
 struct MessagingInfo;
 struct LearnParameters;
 class SlicePlot;
+class ABCParameters;
 
 class Mesh {
     friend class SlicePlot;
@@ -50,8 +51,10 @@ public:
     
     // optional step: test stiffness and mass
     void test();
-    
-    // get Quads 
+
+    std::string ABC_verbose() const;
+
+    // get Quads
     int getNumQuads() const {return mQuads.size();};
     const Quad *getQuad(int index) const {return mQuads[index];};
     
@@ -104,6 +107,10 @@ private:
     // attenuation builder
     const AttBuilder *mAttBuilder;
     
+    // ABCs
+    RDCol2 mU0_range, mVref_range;
+    ABCParameters *mABCPar;
+
     /////////////////////// local build ///////////////////////
     // Quads
     std::vector<Quad *> mQuads;

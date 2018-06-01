@@ -34,7 +34,7 @@ SET(CMAKE_Fortran_COMPILER     gfortran)
 SET(NPOL 4)
 
 # solver precision
-SET(USE_DOUBLE FALSE)
+SET(USE_DOUBLE TRUE)
 
 # use parallel NetCDF or not
 # Modules that require parallel NetCDF: 
@@ -196,6 +196,7 @@ add_executable(
     src/core/fftw/SolverFFTW.cpp
     src/core/fftw/SolverFFTW_1.cpp
     src/core/fftw/SolverFFTW_3.cpp
+    src/core/fftw/SolverFFTW_N.cpp
     src/core/fftw/SolverFFTW_N3.cpp
     src/core/fftw/SolverFFTW_N6.cpp
     src/core/fftw/SolverFFTW_N9.cpp
@@ -296,6 +297,7 @@ add_executable(
     src/preloop/source/Source.cpp
     src/preloop/source/Earthquake.cpp
     src/preloop/source/PointForce.cpp
+    src/preloop/source/PressureSource.cpp
     src/preloop/source/NullSource.cpp
     src/preloop/source/stf/STF.cpp
     src/preloop/source/stf/ErfSTF.cpp

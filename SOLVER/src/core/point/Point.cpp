@@ -6,7 +6,7 @@
 
 Point::Point(int nr, bool axial, const RDCol2 &crds):
 mNr(nr), mNu(nr / 2), mAxial(axial), mCoords(crds) {
-    // nothing
+    mIsFS = false;
 }
 
 void Point::scatterDisplToElement(vec_ar3_CMatPP &displ, int ipol, int jpol, int maxNu) const {

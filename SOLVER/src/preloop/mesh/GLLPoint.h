@@ -21,7 +21,9 @@ public:
         mSFNormal += normal; 
         mSFNormal_assmble += normal;
     };
-    
+    void addGamma(const double gamma) {mGamma = gamma;};
+    RDCol2 getCoords() const {return mCoords;};
+
     void setOceanDepth(const RDColX &depth) {mOceanDepth = depth;};
     void addSurfNormal(const RDMatX3 &normal) {mSurfNormal += normal;};
     
@@ -61,6 +63,7 @@ private:
     
     // total reference count
     int mReferenceCount;
-    
-};
 
+    double mGamma;
+
+};
