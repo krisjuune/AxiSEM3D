@@ -1,8 +1,8 @@
 // ExodusModel.cpp
-// created by Kuangdai on 2-May-2016 
+// created by Kuangdai on 2-May-2016
 // read Exodus mesh file
 
-// Adapted from salvus project 
+// Adapted from salvus project
 // ExodusModel.cpp by Michael Afanasiev
 
 
@@ -35,11 +35,11 @@ void ExodusModel::initialize() {
         readRawData();
     }
     MultilevelTimer::end("Read Exodus", 1);
-    
+
     MultilevelTimer::begin("Bcast Exodus", 1);
     bcastRawData();
     MultilevelTimer::end("Bcast Exodus", 1);
-    
+
     MultilevelTimer::begin("Process Exodus", 1);
     formStructured();
     formAuxiliary();
@@ -51,18 +51,18 @@ void ExodusModel::readRawData() {
     NetCDF_Reader reader;
     reader.open(mExodusFileName);
     RDMatXX dbuffer;
-    
+
     // global
     reader.readString("name_glo_var", mGlobalVariableNames);
     reader.read1D("vals_glo_var", mGlobalVariableValues);
     reader.readString("info_records", mGlobalRecordsRaw);
-    
+
     // connectivity and coords
     reader.read2D("connect1", mConnectivity);
     mConnectivity.array() -= 1;
     reader.read1D("coordx", mNodalS);
     reader.read1D("coordy", mNodalZ);
-        
+
     // elemental variables
     reader.readString("name_elem_var", mElementalVariableNames);
     mElementalVariableValues = RDMatXX::Zero(getNumQuads(), mElementalVariableNames.size());
@@ -71,8 +71,8 @@ void ExodusModel::readRawData() {
         ss << "vals_elem_var" << i + 1 << "eb1";
         reader.read2D(ss.str(), dbuffer);
         mElementalVariableValues.col(i) = dbuffer.transpose();
-    }    
-    
+    }
+
     // side sets
     reader.readString("ss_names", mSideSetNames);
     mSideSetValues = IMatXX::Zero(getNumQuads(), mSideSetNames.size());
@@ -92,13 +92,28 @@ void ExodusModel::readRawData() {
         }
         mSideSetValues.col(i) = values;
     }
-    
-    // ellipticity
-    try {
-      reader.read2D("ellipticity", dbuffer);
-      mEllipKnots = dbuffer.row(0).transpose();
-      mEllipCoeffs = dbuffer.row(1).transpose();
-    } catch (...) {}
+
+    // do not read ellipticity for cartesian
+    bool cartesian = false;
+    for (int i = 0; i < mGlobalRecordsRaw.size(); i++) {
+        std::vector<std::string> substrs = Parameters::splitString(mGlobalRecordsRaw[i], "=");
+        if (boost::iequals(boost::trim_copy(substrs[0]), "crdsys") &&
+            boost::iequals(boost::trim_copy(substrs[1]), "cartesian")) {
+            cartesian = true;
+            break;
+        }
+    }
+    if (cartesian) {
+        mEllipKnots = RDColX::Zero(0);
+        mEllipCoeffs = RDColX::Zero(0);
+        // set radius to PREM
+        mGlobalVariables.insert(std::pair<std::string, double>("radius", 6371e3));
+    } else {
+        // ellipticity
+        reader.read2D("ellipticity", dbuffer);
+        mEllipKnots = dbuffer.row(0).transpose();
+        mEllipCoeffs = dbuffer.row(1).transpose();
+    }
 
     // close file
     reader.close();
@@ -108,17 +123,17 @@ void ExodusModel::bcastRawData() {
     XMPI::bcast(mGlobalVariableNames);
     XMPI::bcastEigen(mGlobalVariableValues);
     XMPI::bcast(mGlobalRecordsRaw);
-    
+
     XMPI::bcastEigen(mConnectivity);
     XMPI::bcastEigen(mNodalS);
     XMPI::bcastEigen(mNodalZ);
-    
+
     XMPI::bcast(mElementalVariableNames);
     XMPI::bcastEigen(mElementalVariableValues);
-    
+
     XMPI::bcast(mSideSetNames);
     XMPI::bcastEigen(mSideSetValues);
-    
+
     XMPI::bcastEigen(mEllipKnots);
     XMPI::bcastEigen(mEllipCoeffs);
 }
@@ -132,7 +147,7 @@ void ExodusModel::formStructured() {
         }
         mGlobalVariables.insert(std::pair<std::string, double>(varName, mGlobalVariableValues(i)));
     }
-    
+
     // global records
     std::vector<std::string> included = {"crdsys", "model"};
     for (int i = 0; i < mGlobalRecordsRaw.size(); i++) {
@@ -142,19 +157,19 @@ void ExodusModel::formStructured() {
                 boost::trim_copy(substrs[0]), boost::trim_copy(substrs[1])));
         }
     }
-    
+
     // elemental variables
     for (int i = 0; i < mElementalVariableNames.size(); i++) {
-        mElementalVariables.insert(std::pair<std::string, RDColX>(mElementalVariableNames[i], 
+        mElementalVariables.insert(std::pair<std::string, RDColX>(mElementalVariableNames[i],
             mElementalVariableValues.col(i)));
     }
-    
+
     // side sets
     for (int i = 0; i < mSideSetNames.size(); i++) {
-        mSideSets.insert(std::pair<std::string, IColX>(mSideSetNames[i], 
+        mSideSets.insert(std::pair<std::string, IColX>(mSideSetNames[i],
             mSideSetValues.col(i)));
     }
-    
+
     // name of axis and surface sets
     mSSNameAxis = isCartesian() ? "x0" : "t0";
     mSSNameSurface = isCartesian() ? "y1" : "r1";
@@ -162,13 +177,13 @@ void ExodusModel::formStructured() {
     mSSNameLowerB = isCartesian() ? "y0" : "r0";
 
     // NOTE: we temporarily treat Cartesian meshes as special cases of spherical meshes
-    //       by means of moving it to the "north pole". The introduced global 
+    //       by means of moving it to the "north pole". The introduced global
     //       curvature should be ignorable, or the problem itself is ill-defined
     //       as a local problem.
     if (isCartesian()) {
         double R_EARTH = getROuter();
         double maxz = mNodalZ.maxCoeff();
-        mNodalZ.array() += R_EARTH - maxz; 
+        mNodalZ.array() += R_EARTH - maxz;
     }
 }
 
@@ -202,7 +217,7 @@ void ExodusModel::formAuxiliary() {
     mHmin = 1000 * mHmin;
     mDistTolerance = XMPI::min(distTol);
     MultilevelTimer::end("Process Exodus DistTol", 2);
-    
+
     // rotate nodes of axial elements such that side 3 is on axis, side 1 is the right boundary and side 0 is the lower boundary
     MultilevelTimer::begin("Process Exodus Axis", 2);
     for (int axialQuad = 0; axialQuad < getNumQuads(); axialQuad++) {
@@ -296,7 +311,7 @@ void ExodusModel::formAuxiliary() {
             double dist3 = sqrt((s3 - s0) * (s3 - s0) + (z3 - z0) * (z3 - z0));
             mAveGLLSpacing(i) += (dist0 + dist1 + dist2 + dist3) / 4. / nPol / refElem[i].size();
         }
-    } 
+    }
     XMPI::sumEigenDouble(mAveGLLSpacing);
     MultilevelTimer::end("Process Exodus GLL-Spacing", 2);
 
@@ -359,7 +374,7 @@ void ExodusModel::formAuxiliary() {
         }
     }
     MultilevelTimer::end("Process Exodus Vicinal", 2);
-    
+
     // check if ocean presents in mesh
     MultilevelTimer::begin("Process Exodus Check Ocean", 2);
     std::string strVs = isIsotropic() ? "VS_0" : "VSV_0";
@@ -373,6 +388,25 @@ void ExodusModel::formAuxiliary() {
         double vs = mElementalVariables.at(strVs)(iQuad);
     }
     MultilevelTimer::end("Process Exodus Check Ocean", 2);
+
+    // CMB and ICB
+    // MultilevelTimer::begin("Process Exodus CMB & ICB", 2);
+    // mR_CMB = DBL_MIN;
+    // mR_ICB = DBL_MAX;
+    // for (int i = 0; i < getNumQuads(); i++) {
+    //     bool isFluid = getElementalVariables("fluid", i) > .5;
+    //     bool isAxis = getSideAxis(i) >= 0;
+    //     if (isFluid && isAxis) {
+    //         for (int j = 0; j < 4; j++) {
+    //             double s = mNodalS(mConnectivity(i, j));
+    //             double z = mNodalZ(mConnectivity(i, j));
+    //             double r = std::sqrt(s * s + z * z);
+    //             mR_CMB = std::max(mR_CMB, r);
+    //             mR_ICB = std::min(mR_ICB, r);
+    //         }
+    //     }
+    // }
+    // MultilevelTimer::end("Process Exodus CMB & ICB", 2);
 }
 
 void ExodusModel::AddAbsorbingBoundaryElements() {
@@ -513,7 +547,7 @@ std::string ExodusModel::verbose() const {
         widthname = std::max(widthname, (int)(it->first.length()));
     }
     for (auto it = mGlobalRecords.begin(); it != mGlobalRecords.end(); it++) {
-        widthname = std::max(widthname, (int)(it->first.length()));    
+        widthname = std::max(widthname, (int)(it->first.length()));
     }
     for (auto it = mGlobalVariables.begin(); it != mGlobalVariables.end(); it++) {
         ss << "    " << std::setw(widthname) << it->first << "   =   " << it->second << std::endl;
@@ -553,7 +587,7 @@ std::string ExodusModel::verbose() const {
     for (auto it = mElementalVariables.begin(); it != mElementalVariables.end(); it++) {
         ss << "    " << std::setw(widthname) << it->first << ": ";
         ss << std::setw(13) << it->second(0) << ", ..., ";
-        ss << std::setw(13) << it->second(getNumQuads() - 1) << std::endl;        
+        ss << std::setw(13) << it->second(getNumQuads() - 1) << std::endl;
     }
     ss << "  Side Sets_________________________________________________" << std::endl;
     widthname = -1;
@@ -586,7 +620,7 @@ std::string ExodusModel::verbose() const {
     return ss.str();
 }
 
-void ExodusModel::buildInparam(ExodusModel *&exModel, const Parameters &par, 
+void ExodusModel::buildInparam(ExodusModel *&exModel, const Parameters &par,
     AttParameters *&attPar, int verbose) {
     if (exModel) {
         delete exModel;
@@ -604,7 +638,7 @@ void ExodusModel::buildInparam(ExodusModel *&exModel, const Parameters &par,
     if (verbose) {
         XMPI::cout << exModel->verbose();
     }
-    
+
     // form attenuation parameters
     if (exModel->hasAttenuation()) {
         int nr_lin_solids = (int)exModel->mGlobalVariables.at("nr_lin_solids");
@@ -629,7 +663,7 @@ void ExodusModel::buildInparam(ExodusModel *&exModel, const Parameters &par,
             attPar = 0;
         }
     }
-    
+
     // ellipticity
     if (exModel->isCartesian()) {
         return;
@@ -642,8 +676,7 @@ void ExodusModel::buildInparam(ExodusModel *&exModel, const Parameters &par,
         double inv_f = par.getValue<double>("MODEL_3D_ELLIPTICITY_INVF");
         if (inv_f <= 0.) {
             throw std::runtime_error("ExodusModel::buildInparam || Invalid flattening.");
-        } 
+        }
         Geodesy::setup(exModel->getROuter(), 1. / inv_f, exModel->mEllipKnots, exModel->mEllipCoeffs);
     }
 }
-

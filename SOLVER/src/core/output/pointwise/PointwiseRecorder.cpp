@@ -23,20 +23,30 @@ PointwiseRecorder::~PointwiseRecorder() {
 
 void PointwiseRecorder::addReceiver(const std::string &name, const std::string &network, 
     double phi, const RDMatPP &weights, const Element *ele, double theta, double baz,
-    double lat, double lon, double dep) {
-    mPointwiseInfo.push_back(PointwiseInfo(name, network, phi, weights, ele, theta, baz, lat, lon, dep));
+    double lat, double lon, double dep, bool dumpStrain, bool dumpCurl) {
+    mPointwiseInfo.push_back(PointwiseInfo(name, network, phi, weights, ele, theta, baz, 
+        lat, lon, dep, dumpStrain, dumpCurl));
 }
 
 void PointwiseRecorder::initialize() {
     int numRec = mPointwiseInfo.size();
     mBufferDisp = RMatXX_RM::Zero(mBufferSize, numRec * 3);
     mBufferTime = RColX::Zero(mBufferSize);
-    std::vector<std::string> names;
-    std::vector<std::string> networks;
+    int numStrainRec = 0;
     for (const auto &rec: mPointwiseInfo) {
-        names.push_back(rec.mName);
-        networks.push_back(rec.mNetwork);
+        if (rec.mDumpStrain) {
+            numStrainRec++;
+        }
     }
+    mBufferStrain = RMatXX_RM::Zero(mBufferSize, numStrainRec * 6);
+    
+    int numCurlRec = 0;
+    for (const auto &rec: mPointwiseInfo) {
+        if (rec.mDumpCurl) {
+            numCurlRec++;
+        }
+    }
+    mBufferCurl = RMatXX_RM::Zero(mBufferSize, numCurlRec * 3);
     for (const auto &io: mIOs) {
         io->initialize(mTotalRecordSteps, mBufferSize, mComponents, mPointwiseInfo,
             mSrcLat, mSrcLon, mSrcDep);
@@ -85,6 +95,34 @@ void PointwiseRecorder::record(int tstep, Real t) {
         mBufferDisp.block(mBufferLine, irec * 3, 1, 3) = gm;
     }
     
+    // get strain
+    static RRow6 strain;
+    int istrain = 0;
+    for (int irec = 0; irec < mPointwiseInfo.size(); irec++) {
+        if (mPointwiseInfo[irec].mDumpStrain) {
+            // compute from element
+            mPointwiseInfo[irec].mElement->computeStrain(mPointwiseInfo[irec].mPhi, 
+                mPointwiseInfo[irec].mWeights, strain);
+            // write to buffer
+            mBufferStrain.block(mBufferLine, istrain * 6, 1, 6) = strain;
+            istrain++;
+        }
+    }
+    
+    // get curl
+    static RRow3 curl;
+    int icurl = 0;
+    for (int irec = 0; irec < mPointwiseInfo.size(); irec++) {
+        if (mPointwiseInfo[irec].mDumpCurl) {
+            // compute from element
+            mPointwiseInfo[irec].mElement->computeCurl(mPointwiseInfo[irec].mPhi, 
+                mPointwiseInfo[irec].mWeights, curl);
+            // write to buffer
+            mBufferCurl.block(mBufferLine, icurl * 3, 1, 3) = curl;
+            icurl++;
+        }
+    }
+    
     // increment buffer line
     mBufferLine++;
     
@@ -96,7 +134,7 @@ void PointwiseRecorder::record(int tstep, Real t) {
 
 void PointwiseRecorder::dumpToFile() {
     for (const auto &io: mIOs) {
-        io->dumpToFile(mBufferDisp, mBufferTime, mBufferLine);
+        io->dumpToFile(mBufferDisp, mBufferStrain, mBufferCurl, mBufferTime, mBufferLine);
     }
     mBufferLine = 0;
 }

@@ -1,8 +1,8 @@
 // ExodusModel.h
-// created by Kuangdai on 2-May-2016 
+// created by Kuangdai on 2-May-2016
 // read Exodus mesh file
 
-// Adapted from salvus project 
+// Adapted from salvus project
 // ExodusModel.h by Michael Afanasiev
 
 #pragma once
@@ -16,11 +16,11 @@ class Parameters;
 class AttParameters;
 
 class ExodusModel {
-    
+
 public:
     ExodusModel(const std::string &fileName);
     void initialize();
-    
+
     // general
     bool isIsotropic() const {return mElementalVariables.find("VP_0") != mElementalVariables.end();};
     bool hasAttenuation() const {return mGlobalVariables.find("nr_lin_solids") != mGlobalVariables.end();};
@@ -47,7 +47,7 @@ public:
     double getNodalS(int nodeTag) const {return mNodalS(nodeTag);};
     double getNodalZ(int nodeTag) const {return mNodalZ(nodeTag);};
     double getAveGLLSpacing(int nodeTag) const {return mAveGLLSpacing(nodeTag);};
-    
+
     // Quad-wise
     double getElementalVariables(const std::string &varName, int quadTag) const {
         return mElementalVariables.at(varName)(quadTag);
@@ -73,12 +73,15 @@ public:
     double getABVmax() const {return mABC_Vmax;};
 
     std::string verbose() const;
-    
-    static void buildInparam(ExodusModel *&exModel, const Parameters &par, 
+
+    static void buildInparam(ExodusModel *&exModel, const Parameters &par,
         AttParameters *&attPar, int verbose);
-    
+
+    // double getR_CMB() const {return mR_CMB;};
+    // double getR_ICB() const {return mR_ICB;};
+
 private:
-    
+
     void readRawData();
     void bcastRawData();
     void formStructured();
@@ -90,40 +93,40 @@ private:
 
     // file properties
     std::string mExodusTitle;
-    
+
     ///////////////////////////////////// raw data /////////////////////////////////////
     // global variables and records
     std::vector<std::string> mGlobalVariableNames;
     RDColX mGlobalVariableValues;
     std::vector<std::string> mGlobalRecordsRaw;
-    
+
     // connectivity and coords
     IMatX4 mConnectivity;
     RDColX mNodalS, mNodalZ;
-    
+
     // elemental variables
     std::vector<std::string> mElementalVariableNames;
     RDMatXX mElementalVariableValues;
-    
+
     // side sets
     std::vector<std::string> mSideSetNames;
     IMatXX mSideSetValues;
-    
+
     // ellipticity
     RDColX mEllipKnots;
     RDColX mEllipCoeffs;
-    
+
     ///////////////////////////////////// structured /////////////////////////////////////
     // global variables and records
     std::map<std::string, double> mGlobalVariables;
     std::map<std::string, std::string> mGlobalRecords;
-    
+
     // elemental variables
     std::map<std::string, RDColX> mElementalVariables;
-    
+
     // side sets
     std::map<std::string, IColX> mSideSets;
-    
+
     std::string mSSNameAxis = "t0";
     std::string mSSNameSurface = "r1";
     std::string mSSNameRightB = "t1";
@@ -132,7 +135,7 @@ private:
     ///////////////////////////////////// auxiliary /////////////////////////////////////
     // for Nr map
     RDColX mAveGLLSpacing;
-    IMatX4 mVicinalAxis; 
+    IMatX4 mVicinalAxis;
     double mDistTolerance;
 
     // for ABCs

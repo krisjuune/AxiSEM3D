@@ -1,6 +1,6 @@
 // Receiver.cpp
-// created by Kuangdai on 13-May-2016 
-// receiver   
+// created by Kuangdai on 13-May-2016
+// receiver
 
 #include "Receiver.h"
 #include "XMath.h"
@@ -18,9 +18,10 @@
 
 Receiver::Receiver(const std::string &name, const std::string &network,
     double theta_lat, double phi_lon, bool geographic,
-    double depth, double srcLat, double srcLon, double srcDep,
+    double depth, bool dumpStrain, bool dumpCurl,
+    double srcLat, double srcLon, double srcDep,
     bool cartesian):
-mName(name), mNetwork(network), mDepth(depth) {
+mName(name), mNetwork(network), mDepth(depth), mDumpStrain(dumpStrain), mDumpCurl(dumpCurl) {
     RDCol3 rtpG, rtpS;
     if (geographic) {
         rtpG(0) = 1.;
@@ -43,15 +44,18 @@ mName(name), mNetwork(network), mDepth(depth) {
     mLon = Geodesy::phi2Lon(rtpG(2));
     mBackAzimuth = Geodesy::backAzimuth(srcLat, srcLon, srcDep, mLat, mLon, mDepth);
     // // test
-    // XMPI::cout << name << " " << network << " "; 
+    // XMPI::cout << name << " " << network << " ";
     // XMPI::cout << mLat << " " << mLon << " " << " 0.0 " << mDepth << XMPI::endl;
 }
 
-void Receiver::release(PointwiseRecorder &recorderPW, const Domain &domain, 
+void Receiver::release(PointwiseRecorder &recorderPW, const Domain &domain,
     int elemTag, const RDMatPP &interpFact) {
     Element *myElem = domain.getElement(elemTag);
+    if (mDumpStrain || mDumpCurl) {
+        myElem->forceTIso();
+    }
     recorderPW.addReceiver(mName, mNetwork, mPhi, interpFact, myElem, mTheta, mBackAzimuth,
-        mLat, mLon, mDepth);
+        mLat, mLon, mDepth, mDumpStrain, mDumpCurl);
 }
 
 bool Receiver::locate(const Mesh &mesh, int &elemTag, RDMatPP &interpFact, bool cartesian) const {
@@ -78,10 +82,10 @@ bool Receiver::locate(const Mesh &mesh, int &elemTag, RDMatPP &interpFact, bool 
             if (std::abs(srcXiEta(0)) <= 1.000001 && std::abs(srcXiEta(1)) <= 1.000001) {
                 elemTag = quad->getElementTag();
                 RDColP interpXi, interpEta;
-                XMath::interpLagrange(srcXiEta(0), nPntEdge, 
-                    quad->isAxial() ? SpectralConstants::getP_GLJ().data(): 
+                XMath::interpLagrange(srcXiEta(0), nPntEdge,
+                    quad->isAxial() ? SpectralConstants::getP_GLJ().data():
                     SpectralConstants::getP_GLL().data(), interpXi.data());
-                XMath::interpLagrange(srcXiEta(1), nPntEdge, 
+                XMath::interpLagrange(srcXiEta(1), nPntEdge,
                     SpectralConstants::getP_GLL().data(), interpEta.data());
                 interpFact = interpXi * interpEta.transpose();
                 if (quad->isFluid() && quad->onSFBoundary()) {
@@ -113,4 +117,3 @@ std::string Receiver::verbose(bool geographic, int wname, int wnet) const {
     ss << mDepth;
     return ss.str();
 }
-

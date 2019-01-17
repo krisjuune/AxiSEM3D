@@ -1,5 +1,5 @@
 // Receiver.cpp
-// created by Kuangdai on 1-Jun-2016 
+// created by Kuangdai on 1-Jun-2016
 // receiver collections
 
 #include "ReceiverCollection.h"
@@ -26,6 +26,8 @@ mInputFile(fileRec), mGeographic(geographic), mCartesian(cartesian), mSaveWholeS
 mSrcLat(srcLat), mSrcLon(srcLon), mSrcDep(srcDep) {
     std::vector<std::string> name, network;
     std::vector<double> theta, phi, depth;
+    std::vector<int> dumpStrain;
+    std::vector<int> dumpCurl;
     if (!boost::iequals(fileRec, "none")) {
         mInputFile = Parameters::sInputDirectory + "/" + mInputFile;
         if (XMPI::root()) {
@@ -38,14 +40,33 @@ mSrcLat(srcLat), mSrcLon(srcLon), mSrcDep(srcDep) {
             while (getline(fs, line)) {
                 try {
                     std::vector<std::string> strs = Parameters::splitString(line, "\t ");
-                    if (strs.size() < 5 || strs.size() > 6) {
+                    int npar = strs.size();
+                    if (npar < 6) {
                         continue;
+                    }
+                    double theta_try = boost::lexical_cast<double>(strs[2]);
+                    double phi_try = boost::lexical_cast<double>(strs[3]);
+                    // the 4th column (elevation) is ignored
+                    double depth_try = boost::lexical_cast<double>(strs[5]);
+                    int strain_try = 0;
+                    int curl_try = 0;
+                    if (npar > 6) {
+                        for (int ipar = 6; ipar < npar; ipar++) {
+                            if (boost::iequals(strs[ipar], "dump_strain")) {
+                                strain_try = 1;
+                            }
+                            if (boost::iequals(strs[ipar], "dump_curl")) {
+                                curl_try = 1;
+                            }
+                        }
                     }
                     name.push_back(strs[0]);
                     network.push_back(strs[1]);
-                    theta.push_back(boost::lexical_cast<double>(strs[2]));
-                    phi.push_back(boost::lexical_cast<double>(strs[3]));
-                    depth.push_back(boost::lexical_cast<double>(strs[strs.size() - 1]));
+                    theta.push_back(theta_try);
+                    phi.push_back(phi_try);
+                    depth.push_back(depth_try);
+                    dumpStrain.push_back(strain_try);
+                    dumpCurl.push_back(curl_try);
                 } catch(std::exception) {
                     // simply ignore invalid lines
                     continue;
@@ -58,8 +79,10 @@ mSrcLat(srcLat), mSrcLon(srcLon), mSrcDep(srcDep) {
         XMPI::bcast(theta);
         XMPI::bcast(phi);
         XMPI::bcast(depth);
+        XMPI::bcast(dumpStrain);
+        XMPI::bcast(dumpCurl);
     }
-    
+
     // create receivers
     mWidthName = -1;
     mWidthNetwork = -1;
@@ -89,7 +112,8 @@ mSrcLat(srcLat), mSrcLon(srcLon), mSrcDep(srcDep) {
         recKeys.push_back(key);
         // add receiver
         mReceivers.push_back(new Receiver(name[i], network[i],
-            theta[i], phi[i], geographic, depth[i], srcLat, srcLon, srcDep, mCartesian));
+            theta[i], phi[i], geographic, depth[i], (bool)dumpStrain[i], (bool)dumpCurl[i],
+            srcLat, srcLon, srcDep, mCartesian));
         mWidthName = std::max(mWidthName, (int)name[i].length());
         mWidthNetwork = std::max(mWidthNetwork, (int)network[i].length());
     }
@@ -114,7 +138,7 @@ void ReceiverCollection::release(Domain &domain, const Mesh &mesh) {
         }
     }
     MultilevelTimer::end("Locate Receivers", 2);
-    
+
     // release to domain
     MultilevelTimer::begin("Release to Domain", 2);
     PointwiseRecorder *recorderPW = new PointwiseRecorder(
@@ -123,28 +147,28 @@ void ReceiverCollection::release(Domain &domain, const Mesh &mesh) {
     for (int irec = 0; irec < mReceivers.size(); irec++) {
         int recRankMin = XMPI::min(recRank[irec]);
         if (recRankMin == XMPI::nproc()) {
-            throw std::runtime_error("ReceiverCollection::release || Error locating receiver || " 
+            throw std::runtime_error("ReceiverCollection::release || Error locating receiver || "
                 "Name = " + mReceivers[irec]->getName() + "; "
                 "Network = " + mReceivers[irec]->getNetwork());
         }
         if (recRankMin == XMPI::rank()) {
-            mReceivers[irec]->release(*recorderPW, 
+            mReceivers[irec]->release(*recorderPW,
                 domain, recETag[irec], recInterpFact[irec]);
         }
     }
-    
+
     // IO
     for (const auto &io: mPointwiseIO) {
         recorderPW->addIO(io);
     }
-    
+
     // add recorder to domain
     domain.setPointwiseRecorder(recorderPW);
-    
+
     // whole surface
     if (mSaveWholeSurface) {
-        SurfaceRecorder *recorderSF = new SurfaceRecorder(mTotalRecordSteps, 
-            mRecordInterval, mBufferSize, 
+        SurfaceRecorder *recorderSF = new SurfaceRecorder(mTotalRecordSteps,
+            mRecordInterval, mBufferSize,
             mSrcLat, mSrcLon, mSrcDep);
         for (int iloc = 0; iloc < mesh.getNumQuads(); iloc++) {
             const Quad *quad = mesh.getQuad(iloc);
@@ -183,7 +207,7 @@ void ReceiverCollection::buildInparam(ReceiverCollection *&rec, const Parameters
     if (rec) {
         delete rec;
     }
-    
+
     // create from file
     std::string recFile = par.getValue<std::string>("OUT_STATIONS_FILE");
     std::string recSys = par.getValue<std::string>("OUT_STATIONS_SYSTEM");
@@ -239,17 +263,19 @@ void ReceiverCollection::buildInparam(ReceiverCollection *&rec, const Parameters
         throw std::runtime_error("ReceiverCollection::buildInparam || "
             "Invalid parameter, keyword = OUT_STATIONS_COMPONENTS.");
     }
-    
+
     // IO
     int numFmt = par.getSize("OUT_STATIONS_FORMAT");
     // use bool first to avoid duplicated IO
-    bool ascii = false, netcdf = false; 
+    bool ascii = false, netcdf = false, netcdf_no_assemble = false;
     for (int i = 0; i < numFmt; i++) {
-        std::string strfmt = par.getValue<std::string>("OUT_STATIONS_FORMAT", i); 
+        std::string strfmt = par.getValue<std::string>("OUT_STATIONS_FORMAT", i);
         if (boost::iequals(strfmt, "ascii")) {
             ascii = true;
         } else if (boost::iequals(strfmt, "netcdf")) {
             netcdf = true;
+        } else if (boost::iequals(strfmt, "netcdf_no_assemble")) {
+            netcdf_no_assemble = true;
         } else {
             throw std::runtime_error("ReceiverCollection::buildInparam || "
                 "Invalid parameter, keyword = OUT_STATIONS_FORMAT.");
@@ -260,11 +286,13 @@ void ReceiverCollection::buildInparam(ReceiverCollection *&rec, const Parameters
         rec->mPointwiseIO.push_back(new PointwiseIOAscii());
     }
     if (netcdf) {
-        rec->mPointwiseIO.push_back(new PointwiseIONetCDF());
+        rec->mPointwiseIO.push_back(new PointwiseIONetCDF(true));
     }
-    
+    if (netcdf_no_assemble) {
+        rec->mPointwiseIO.push_back(new PointwiseIONetCDF(false));
+    }
+
     if (verbose) {
         XMPI::cout << rec->verbose();
     }
 }
-

@@ -1,5 +1,5 @@
 // Mesh.cpp
-// created by Kuangdai on 5-May-2016 
+// created by Kuangdai on 5-May-2016
 // AxiSEM3D Mesh
 
 #include "Mesh.h"
@@ -34,10 +34,10 @@ Mesh::~Mesh() {
     delete mABCPar;
     for (const auto &sp: mSlicePlots) {
         delete sp;
-    }    
+    }
 }
 
-Mesh::Mesh(const ExodusModel *exModel, const NrField *nrf, 
+Mesh::Mesh(const ExodusModel *exModel, const NrField *nrf,
     double srcLat, double srcLon, double srcDep, const Parameters &par, int verbose):
 mExModel(exModel), mNrField(nrf), mSrcLat(srcLat), mSrcLon(srcLon), mSrcDep(srcDep) {
     mAttBuilder = 0;
@@ -74,7 +74,7 @@ mExModel(exModel), mNrField(nrf), mSrcLat(srcLat), mSrcLon(srcLon), mSrcDep(srcD
     } else {
          throw std::runtime_error("Mesh::Mesh || Invalid input for MODEL_2D_MODE.");
     }
-    
+
     // slice plots
     SlicePlot::buildInparam(mSlicePlots, par, this, verbose);
     if (mSlicePlots.size() > 0 && XMPI::root()) {
@@ -82,7 +82,7 @@ mExModel(exModel), mNrField(nrf), mSrcLat(srcLat), mSrcLon(srcLon), mSrcDep(srcD
         // node coordinates
         fs.open(Parameters::sOutputDirectory + "/plots/mesh_coordinates.txt", std::fstream::out);
         for (int i = 0; i < exModel->getNumNodes(); i++) {
-            fs << exModel->getNodalS(i) << " " << exModel->getNodalZ(i) << std::endl; 
+            fs << exModel->getNodalS(i) << " " << exModel->getNodalZ(i) << std::endl;
         }
         fs.close();
         // element connectivity
@@ -97,7 +97,7 @@ void Mesh::buildUnweighted() {
     DecomposeOption option;
     option.mProcInterval = mDDPar->mProcInterval;
     option.mNCutsPerProc = mDDPar->mNCutsPerProc;
-    int nElemGlobal = mExModel->getNumQuads(); 
+    int nElemGlobal = mExModel->getNumQuads();
     option.mElemWeights = RDColX::Zero(nElemGlobal);
     for (int iquad = 0; iquad < nElemGlobal; iquad++) {
         int inode = mExModel->getConnectivity()(iquad, 0);
@@ -140,7 +140,7 @@ void Mesh::buildWeighted() {
     MultilevelTimer::begin("Measure", 1);
     measure(measured);
     MultilevelTimer::end("Measure", 1);
-    
+
     MultilevelTimer::begin("Build Local", 1);
     buildLocal(measured);
     MultilevelTimer::end("Build Local", 1);
@@ -158,15 +158,15 @@ void Mesh::release(Domain &domain) {
         point->release(domain);
     }
     MultilevelTimer::end("Release Points", 2);
-    
+
     MultilevelTimer::begin("Release Elements", 2);
     for (int iloc = 0; iloc < getNumQuads(); iloc++) {
         int etag = mQuads[iloc]->release(domain, mLocalElemToGLL[iloc], mAttBuilder, mRecordingWF);
         mQuads[iloc]->setElementTag(etag);
     }
     MultilevelTimer::end("Release Elements", 2);
-    
-    // set messaging 
+
+    // set messaging
     MessagingBuffer *buf = new MessagingBuffer();
     for (int i = 0; i < mMsgInfo->mNProcComm; i++) {
         int sz_total = 0;
@@ -177,20 +177,20 @@ void Mesh::release(Domain &domain) {
         }
         buf->mBufferSend.push_back(CColX(sz_total));
         buf->mBufferRecv.push_back(CColX(sz_total));
-    }    
+    }
     MessagingInfo *msg = new MessagingInfo(*mMsgInfo);
     domain.setMessaging(msg, buf);
-    
+
     // set learn parameters
     domain.setLearnParameters(new LearnParameters(*mLearnPar));
 }
 
 double Mesh::computeRadiusRef(double depth, double lat, double lon) const {
-    // geocentric 
+    // geocentric
     double theta = Geodesy::lat2Theta_d(lat, depth);
     double phi = Geodesy::lon2Phi(lon);
     double router = mExModel->getROuter();
-    
+
     // 2D mode
     if (mPhi2D < -DBL_MAX * .9) {
         RDCol3 rtpG, rtpS;
@@ -204,16 +204,16 @@ double Mesh::computeRadiusRef(double depth, double lat, double lon) const {
         theta = rtpG(1);
         phi = rtpG(2);
     }
-    
+
     // surface receivers
     if (depth < tinyDouble) {
         return router;
     }
-    
+
     // target
     double R = computeRPhysical(router, theta, phi) - depth;
     double distTol = std::min((double)tinySingle, mExModel->getDistTolerance() * tinySingle);
-    
+
     // computeRPhysical is monotonically increasing, so we use Divide-and-Conquer method
     // initial guess = router - depth
     double current = router - depth;
@@ -244,10 +244,11 @@ double Mesh::computeRPhysical(double r, double theta, double phi) const {
     return r + deltaR;
 }
 
+// # include "NetCDF_Writer.h"
 void Mesh::buildLocal(const DecomposeOption &option) {
     // destroy existent
     destroy();
-    
+
     // domain decomposition
     MultilevelTimer::begin("Domain Decomposition", 2);
     int nGllLocal;
@@ -256,16 +257,16 @@ void Mesh::buildLocal(const DecomposeOption &option) {
     Connectivity con_global(mExModel->getConnectivity());
     con_global.decompose(option, nGllLocal, mLocalElemToGLL, *mMsgInfo, procMask);
     MultilevelTimer::end("Domain Decomposition", 2);
-    
-    // form empty points 
+
+    // form empty points
     MultilevelTimer::begin("Generate Points", 2);
     mGLLPoints.reserve(nGllLocal);
     for (int i = 0; i < nGllLocal; i++) {
         mGLLPoints.push_back(new GLLPoint());
     }
     MultilevelTimer::end("Generate Points", 2);
-    
-    // quads 
+
+    // quads
     MultilevelTimer::begin("Generate Quads", 2);
     double s_max, s_min, z_max, z_min;
     mSMax = mZMax = -1e30;
@@ -282,7 +283,7 @@ void Mesh::buildLocal(const DecomposeOption &option) {
             quad->addGeometric3D(mGeometric3D, mSrcLat, mSrcLon, mSrcDep, mPhi2D, ABPosition);
             if (mOceanLoad3D != 0) {
                 quad->setOceanLoad3D(*mOceanLoad3D, mSrcLat, mSrcLon, mSrcDep, mPhi2D);
-            }    
+            }
             // spatial range
             quad->getSpatialRange(s_max, s_min, z_max, z_min);
             mSMax = std::max(mSMax, s_max);
@@ -326,8 +327,8 @@ void Mesh::buildLocal(const DecomposeOption &option) {
         // 1 for reference count
         bufferGLLSend.push_back(RDMatXX::Zero(nr_max * 8 + 1, npoint));
         bufferGLLRecv.push_back(RDMatXX::Zero(nr_max * 8 + 1, npoint));
-    }    
-    
+    }
+
     // feed buffer
     for (int i = 0; i < mMsgInfo->mNProcComm; i++) {
         for (int j = 0; j < mMsgInfo->mNLocalPoints[i]; j++) {
@@ -335,27 +336,27 @@ void Mesh::buildLocal(const DecomposeOption &option) {
             mGLLPoints[pTag]->feedBuffer(bufferGLLSend[i], j);
         }
     }
-    
+
     // send and recv
     for (int i = 0; i < mMsgInfo->mNProcComm; i++) {
         XMPI::isendDouble(mMsgInfo->mIProcComm[i], bufferGLLSend[i], mMsgInfo->mReqSend[i]);
         XMPI::irecvDouble(mMsgInfo->mIProcComm[i], bufferGLLRecv[i], mMsgInfo->mReqRecv[i]);
     }
-    
+
     // wait recv
     XMPI::wait_all(mMsgInfo->mReqRecv.size(), mMsgInfo->mReqRecv.data());
-    
-    // extract buffer 
+
+    // extract buffer
     for (int i = 0; i < mMsgInfo->mNProcComm; i++) {
         for (int j = 0; j < mMsgInfo->mNLocalPoints[i]; j++) {
             int pTag = mMsgInfo->mILocalPoints[i][j];
             mGLLPoints[pTag]->extractBuffer(bufferGLLRecv[i], j);
         }
     }
-    
-    // wait send 
+
+    // wait send
     XMPI::wait_all(mMsgInfo->mReqSend.size(), mMsgInfo->mReqSend.data());
-    
+
     MultilevelTimer::end("Assemble Mass", 2);
 }
 
@@ -383,15 +384,15 @@ void Mesh::measure(DecomposeOption &measured) {
     // a temp Domain
     Domain domain;
     release(domain);
-    
+
     // user clock resolution
     double clockFactor = 1e4;
     double clockResolution = MyBoostTimer::getClockResolution();
-    // minimum number of steps to be measured 
+    // minimum number of steps to be measured
     int minStep = 5;
     // how may elements of the same kind will be measured
     int nMeasureSameKind = 3;
-    
+
     ////////// measure elements //////////
     MultilevelTimer::begin("Measure Elements", 2);
     // initialize with zero weights
@@ -419,7 +420,7 @@ void Mesh::measure(DecomposeOption &measured) {
                 Element *elemOther = domain.getElement(elemTagOther);
                 if (elemOther->costSignature() == coststr) {
                     // use minimum
-                    elemCostLibrary.at(coststr) = std::min(elemOther->measure(nstep), 
+                    elemCostLibrary.at(coststr) = std::min(elemOther->measure(nstep),
                         elemCostLibrary.at(coststr));
                     if (++sameKindFound == nMeasureSameKind) {
                         break;
@@ -429,7 +430,7 @@ void Mesh::measure(DecomposeOption &measured) {
         }
     }
     MultilevelTimer::end("Measure Elements", 2);
-    
+
     // uniform measurements across procs
     MultilevelTimer::begin("Bcast Element Costs", 2);
     std::vector<std::map<std::string, double>> all_elemCostLibrary;
@@ -456,7 +457,7 @@ void Mesh::measure(DecomposeOption &measured) {
     // sum up
     XMPI::sumEigenDouble(eWgtEle);
     MultilevelTimer::end("Bcast Element Costs", 2);
-    
+
 
     ////////// measure points //////////
     MultilevelTimer::begin("Measure Points", 2);
@@ -492,7 +493,7 @@ void Mesh::measure(DecomposeOption &measured) {
         }
     }
     MultilevelTimer::end("Measure Points", 2);
-    
+
     // uniform measurements across procs
     MultilevelTimer::begin("Bcast Point Costs", 2);
     std::vector<std::map<std::string, double>> all_pointCostLibrary;
@@ -512,7 +513,7 @@ void Mesh::measure(DecomposeOption &measured) {
         pWgt(ip) = pointCostLibraryGlobal.at(point->costSignature());
     }
     MultilevelTimer::end("Bcast Point Costs", 2);
-    
+
     // report
     MultilevelTimer::begin("Report Measurements", 2);
     if (XMPI::root() && mDDPar->mReportMeasure) {
@@ -522,16 +523,16 @@ void Mesh::measure(DecomposeOption &measured) {
         for (auto it = elemCostLibraryGlobal.begin(); it != elemCostLibraryGlobal.end(); it++) {
             fs << it->first << "    " << it->second << std::endl;
         }
-        fs << std::endl << "*** Point Types ***" << std::endl;    
+        fs << std::endl << "*** Point Types ***" << std::endl;
         for (auto it = pointCostLibraryGlobal.begin(); it != pointCostLibraryGlobal.end(); it++) {
-            fs << it->first << "    " << it->second << std::endl;    
+            fs << it->first << "    " << it->second << std::endl;
         }
-        fs.close();    
+        fs.close();
     }
     MultilevelTimer::end("Report Measurements", 2);
-    
-    // create option 
-    MultilevelTimer::begin("Create Weights", 2);    
+
+    // create option
+    MultilevelTimer::begin("Create Weights", 2);
     // recast point weights element-wise, considering reference count on edges
     RDColX eWgtPnt = RDColX::Zero(nElemGlobal);
     for (int iloc = 0; iloc < getNumQuads(); iloc++) {
@@ -546,15 +547,15 @@ void Mesh::measure(DecomposeOption &measured) {
     XMPI::sumEigenDouble(eWgtPnt);
     // sum up element and point weights
     measured.mElemWeights = eWgtEle + eWgtPnt;
-    MultilevelTimer::end("Create Weights", 2);    
-    
-    // plot 
+    MultilevelTimer::end("Create Weights", 2);
+
+    // plot
     MultilevelTimer::begin("Plot during Cost Measurements", 2);
     for (const auto &sp: mSlicePlots) {
         sp->plotEleType(domain);
         sp->plotMeasured(measured.mElemWeights);
     }
-    MultilevelTimer::end("Plot during Cost Measurements", 2);    
+    MultilevelTimer::end("Plot during Cost Measurements", 2);
 }
 
 void Mesh::test() {

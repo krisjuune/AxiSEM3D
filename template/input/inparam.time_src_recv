@@ -55,18 +55,21 @@ SOURCE_STF_HALF_DURATION                    0.0
 # ================================ stations ================================
 # WHAT: file of stations
 # TYPE: string (path to file)
-# NOTE: File format 1 -- name network latitude longitude depth
-#       File format 2 -- name network latitude longitude elevation depth
-#       * File format 2 is compatible with SPECFEM input. However, the 
-#         "elevation" column is not used in either SPECFEM or AxiSEM3D.
-#       * The "depth" column should be given in meters.
-#       * Use "none" if no station presents.
+# NOTE: Line format -- name network latitude longitude elevation depth [dump_strain]
+#       * The "elevation" (5th column) is NEVER used in AxiSEM3D because it is redundant.
+#         The actual elevation of a station is determined by topography and its depth.
+#       * The "depth" column should be given in meters instead of km.
+#       * If "dump_strain" is appended after "depth", the strain at this station will be
+#         computed and dumped. Strain components: [RR, TT, ZZ, TZ, RZ, RT] (Voigt rule)
+#       Use "none" if no station presents.
 OUT_STATIONS_FILE                           STATIONS
 
 # WHAT: coordinate system used in OUT_STATIONS_FILE
 # TYPE: geographic / source-centered
-# NOTE: geographic      -- name network latitude longitude [elevation] depth
-#       source-centered -- name network distance azimuth [elevation] depth
+# NOTE: geographic      -- name network latitude longitude elevation depth [dump_strain]
+#       source-centered -- name network distance azimuth elevation depth [dump_strain]
+# the column "elevation" is not used in AxiSEM3D but must be presented in each line
+# if "dump_strain" is appended, strain will be dumped in addition to displacement 
 OUT_STATIONS_SYSTEM                         geographic
 
 # WHAT: if duplicated stations (network + name) are found in OUT_STATIONS_FILE
@@ -77,7 +80,7 @@ OUT_STATIONS_SYSTEM                         geographic
 OUT_STATIONS_DUPLICATED                     rename
 
 # WHAT: seismogram format
-# TYPE: ascii / netcdf 
+# TYPE: ascii / netcdf / netcdf_no_assemble
 # NOTE: may be one or both of the two options
 #       * Do not use ascii if the number of stations exceeds/approximates 
 #         the open-files limit on you OS (find it with "ulimit -n").
@@ -85,6 +88,9 @@ OUT_STATIONS_DUPLICATED                     rename
 #         NetCDF files named axisem3d_synthetics.nc.rankXXXX (XXXX = processor rank),
 #         each containing part of the stations. The complete NetCDF file containing all 
 #         stations, named axisem3d_synthetics.nc, will be assembled after the time loop.
+#       * Assembling axisem3d_synthetics.nc.rankXXXX can be time-consuming for a large 
+#         number of stations, which can be avoided by using netcdf_no_assemble.
+#         A file named station_rank.txt will be provided to locate stations on ranks.  
 #       * If parallel NetCDF library is used, all processors dump directly into 
 #         axisem3d_synthetics.nc during the time loop. 
 #       * Use python_tools/nc2ascii.py to convert axisem3d_synthetics.nc
@@ -115,7 +121,7 @@ OUT_STATIONS_DUMP_INTERVAL                  1000
 # TYPE: bool
 # NOTE: * Having the whole wavefield on the surface, one can extract synthetics
 #         at any unburied receiver locations after the simulation, using the
-#         provided script python_tools/extract_from_surface.py.
+#         provided script python_tools/surface2stations.py.
 #       * parameters OUT_STATIONS_RECORD_INTERVAL and OUT_STATIONS_DUMP_INTERVAL 
 #         still apply to this option.
 OUT_STATIONS_WHOLE_SURFACE                  false

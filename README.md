@@ -4,6 +4,10 @@ I look ugly to you? I am a Markdown file. If you do not have a Markdown reader, 
 
 Report issues to kuangdal@earth.ox.ac.uk.
 
+### Show-off videos on Youtube:
+[![](https://img.youtube.com/vi/60cMKohNQoU/2.jpg)](https://www.youtube.com/watch?v=60cMKohNQoU)
+[![](https://img.youtube.com/vi/nw98Xxy4TdM/2.jpg)](https://www.youtube.com/watch?v=nw98Xxy4TdM)
+
 ## 1 Get AxiSEM3D
 ```sh
 git clone https://github.com/kuangdai/AxiSEM3D
@@ -102,13 +106,11 @@ NetCDF | 4.4 | Follow instructions [here](https://www.unidata.ucar.edu/software/
         ```
 
 ## 4 The MESHER
-In the above examples, we use the mesh file `AxiSEM_prem_ani_one_crust_50.e` (anisotropic PREM model with one crustal layer and a 50 s period), located at `SOLVER/template/input`. To generate an AxiSEM3D mesh like this, you will need the `salvus_mesher`, a python-based command-line tool to generate several types of 2-D and 3-D finite element meshes. 
+In the above examples, we use the mesh file `AxiSEM_prem_ani_one_crust_50.e` (anisotropic PREM model with one crustal layer at a 50 s period), located at `SOLVER/template/input`. 
 
-Currently, the `salvus_mesher` is not published. Here we provide a stable version for AxiSEM3D:
-* Install [pyexodus](https://github.com/SalvusHub/pyexodus) (mainly by Lion Krischer at ETH Zurich)
-* Install [salvus_mesher](https://gitlab.com/Salvus/salvus_mesher) (mainly by van Driel Martin at ETH Zurich)
+To generate an AxiSEM3D mesh like this, you will need the `salvus_mesher_lite`, a python-based command-line tool to generate AxiSEM/AxiSEM3D meshes (credit to van Driel Martin, Lion Krischer and others from the Salvus group at ETH Zurich). 
 
-These two packages have their own requirements and manual. 
+* See installation and usage of `salvus_mesher_lite` from [here](https://gitlab.com/Salvus/SalvusMesherLite). 
 
 
 

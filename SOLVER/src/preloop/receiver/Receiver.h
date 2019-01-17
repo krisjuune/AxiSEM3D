@@ -1,6 +1,6 @@
 // Receiver.h
-// created by Kuangdai on 13-May-2016 
-// receiver   
+// created by Kuangdai on 13-May-2016
+// receiver
 
 #pragma once
 
@@ -15,8 +15,9 @@ class Receiver {
 public:
     Receiver(const std::string &name, const std::string &network,
         double theta_lat, double phi_lon, bool geographic,
-        double depth, double srcLat, double srcLon, double srcDep,
-        bool kmconv);
+        double depth, bool dumpStrain, bool dumpCurl,
+        double srcLat, double srcLon, double srcDep,
+        bool cartesian);
 
     void release(PointwiseRecorder &recorderPW, const Domain &domain,
         int elemTag, const RDMatPP &interpFact);
@@ -24,10 +25,10 @@ public:
     bool locate(const Mesh &mesh, int &elemTag, RDMatPP &interpFact, bool cartesian) const;
 
     std::string verbose(bool geographic, int wname, int wnet) const;
-    
+
     const std::string &getName() const {return mName;};
     const std::string &getNetwork() const {return mNetwork;};
-    
+
 private:
     std::string mName;
     std::string mNetwork;
@@ -35,5 +36,6 @@ private:
     double mLat, mLon;
     double mDepth;
     double mBackAzimuth;
+    bool mDumpStrain;
+    bool mDumpCurl;
 };
-

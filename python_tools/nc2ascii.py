@@ -86,7 +86,7 @@ from multiprocessing import Pool
 ncdf = Dataset(args.in_nc_file, 'r', format='NETCDF4')
 
 # time info
-vartime = ncdf.variables['time_points']
+vartime = ncdf.variables['time_points'][:]
 nsteps = len(vartime)
 strnsteps = str(nsteps)
 assert nsteps > 0, 'Zero time steps'
@@ -172,7 +172,7 @@ def write_ascii(iproc):
         ncdf = Dataset(tempnc, 'r', format='NETCDF4')
 
     for ist, st in enumerate(stations):
-        if (ist % args.nproc != iproc): 
+        if ist % args.nproc != iproc: 
             continue
         
         # station info
@@ -189,7 +189,7 @@ def write_ascii(iproc):
         footer_st = footer_st.replace('@ST@', station)
 
         # data
-        wave = ncdf[var][:, :]
+        wave = ncdf.variables[var][:, :]
         
         # waveform
         for channel in args.channels:
