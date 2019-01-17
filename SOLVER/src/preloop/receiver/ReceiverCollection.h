@@ -17,7 +17,7 @@ class ReceiverCollection {
 public:
     ReceiverCollection(const std::string &fileRec, bool geographic,
         double srcLat, double srcLon, double srcDep, int duplicated,
-        bool saveSurf, bool kmconv);
+        bool saveSurf, bool cartesian);
     ~ReceiverCollection();
     
     void release(Domain &domain, const Mesh &mesh); 
@@ -27,7 +27,7 @@ public:
         
     static void buildInparam(ReceiverCollection *&rec, const Parameters &par,
         double srcLat, double srcLon, double srcDep, int totalStepsSTF,
-        bool kmconv, int verbose);
+        bool cartesian, int verbose);
 private:
     
     // receivers
@@ -35,8 +35,8 @@ private:
     
     // input
     std::string mInputFile;
-    bool mGeographic;
-    
+    bool mGeographic, mCartesian;
+
     // options
     int mTotalRecordSteps = 0;
     int mRecordInterval = 1;

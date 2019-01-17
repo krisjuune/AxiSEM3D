@@ -38,6 +38,7 @@ void Parameters::registerAll() {
     registerPar("MODEL_PLOT_SLICES_NUM");
     registerPar("MODEL_PLOT_SLICES_LIST");
     registerPar("ATTENUATION");
+    registerPar("ABSORBING_BOUNDARIES");
     registerPar("ABC_ELEMENTS");
     registerPar("ABC_FACTOR");
 
@@ -80,7 +81,10 @@ void Parameters::registerAll() {
     registerPar("OUT_STATIONS_RECORD_INTERVAL");
     registerPar("OUT_STATIONS_DUMP_INTERVAL");
     registerPar("OUT_STATIONS_WHOLE_SURFACE");
-    
+    registerPar("OUT_WAVEFIELD_FRAMES");
+    registerPar("OUT_WAVEFIELD_PHI");
+    registerPar("OUT_WAVEFIELD_TIME_START");
+
     // inparam.advanced
     registerPar("ATTENUATION_CG4");
     registerPar("ATTENUATION_SPECFEM_LEGACY");

@@ -9,6 +9,7 @@
 #include "Parameters.h"
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string.hpp>
+#include "AutoGeometricParams.h"
 
 /////////////////////////////// user-defined models here
 #include "Ellipticity.h"
@@ -16,8 +17,8 @@
 #include "Geometric3D_EMC.h"
 /////////////////////////////// user-defined models here
 
-void Geometric3D::buildInparam(std::vector<Geometric3D *> &models, 
-                                const Parameters &par, int verbose) {
+void Geometric3D::buildInparam(std::vector<Geometric3D *> &models,
+        const Parameters &par, std::vector<AutoGeometricParams *> Vol2GeomModels, int verbose) {
     // clear the container
     for (const auto &m: models) {
         delete m;    
@@ -78,5 +79,14 @@ void Geometric3D::buildInparam(std::vector<Geometric3D *> &models,
             XMPI::cout << m->verbose();
         }
     }
-}
 
+   for (int i = 0; i < Vol2GeomModels.size(); i++) {
+       Geometric3D *m = new Geometric3D_EMC();
+       m->initializeOcean(Vol2GeomModels[i]->mRLayer, Vol2GeomModels[i]->mRUpper, Vol2GeomModels[i]->mRLower,
+                          Vol2GeomModels[i]->mX, Vol2GeomModels[i]->mY, Vol2GeomModels[i]->mUndulation);
+       models.push_back(m);
+       if (verbose) {
+            XMPI::cout << m->verbose();
+       }
+   }
+}

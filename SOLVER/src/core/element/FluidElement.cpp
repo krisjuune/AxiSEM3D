@@ -171,33 +171,19 @@ void FluidElement::computeGroundMotion(Real phi, const RMatPP &weights, RRow3 &u
     }
 
     vec_ar3_CMatPP FluidDisp = vec_ar3_CMatPP(mMaxNu + 1, zero_ar3_CMatPP);
-    RMatXN3 &FluidDisp_r = SolverFFTW_N3::getR2C_RMat(mMaxNr);
+    RMatXN3 &FluidDisp_r = SolverFFTW_N3::getR2C_RMat(mMaxNr); //initialise input for P2F
 
-    mGradient->computeGrad(sResponse.mDispl, FluidDisp, mMaxNu, sResponse.mNyquist);
-    FieldFFT::transformF2P(FluidDisp, mMaxNr);
-    FluidDisp_r = SolverFFTW_N3::getC2R_RMat(mMaxNr);
+    mGradient->computeGrad(sResponse.mDispl, FluidDisp, mMaxNu, sResponse.mNyquist); //get gradient of fluid potential (in Fourier)
+    FieldFFT::transformF2P(FluidDisp, mMaxNr); //initialise F2P of FPG
+    FluidDisp_r = SolverFFTW_N3::getC2R_RMat(mMaxNr); //output gradient in physical domain
 
-    if (mAcoustic->is1D()) {
-        RMatPP K = mAcoustic->getK1D();
-        for (int alpha = 0; alpha <= mMaxNu; alpha++) {
-            for (int i = 0; i < 3; i++) {
-                for (int ipol = 0; ipol <= nPol; ipol++) {
-                    for (int jpol = 0; jpol <= nPol; jpol++) {
-                        int ipnt = ipol * nPntEdge + jpol;
-                        FluidDisp_r(alpha, i * nPE + ipnt) *= K(ipol,jpol);
-                    }
-                }
-            }
-        }
-    } else {
-        RMatXN K = mAcoustic->getK3D();
-        for (int alpha = 0; alpha <= mMaxNu; alpha++) {
-            for (int i = 0; i < 3; i++) {
-                for (int ipnt = 0; ipnt < nPE; ipnt++) {
-                    FluidDisp_r(alpha, i * nPE + ipnt) *= K(alpha,ipnt);
-                }
-            }
-        }
+    RMatXN K = mAcoustic->getRho();//"Rho" = 1/rho [kg/m3] in physical domain
+    for (int alpha = 0; alpha <= mMaxNu; alpha++) {
+       for (int i = 0; i < 3; i++) {
+           for (int ipnt = 0; ipnt < nPE; ipnt++) {
+               FluidDisp_r(alpha, i * nPE + ipnt) *= K(alpha,ipnt);//divide gradient by density (automatically updated in P2F)
+           }
+       }
     }
     FieldFFT::transformP2F(FluidDisp, mMaxNr);
 
@@ -259,8 +245,6 @@ void FluidElement::displToStiff() const {
     }
     mGradient->computeQuad(sResponse.mStiff, sResponse.mStress, sResponse.mNu, sResponse.mNyquist);
 }
-
-bool FluidElement::fluid() const {return true;}
 
 //-------------------------- static --------------------------//
 FluidResponse FluidElement::sResponse;

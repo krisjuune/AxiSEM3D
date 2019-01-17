@@ -10,6 +10,7 @@
 #include "SourceTimeFunction.h"
 #include "PointwiseRecorder.h"
 #include "SurfaceRecorder.h"
+#include "WavefieldRecorder.h"
 #include "XMPI.h"
 #include "NuWisdom.h"
 #include "MultilevelTimer.h"
@@ -30,6 +31,7 @@ Domain::~Domain() {
     for (const auto &e: mSourceTerms) {delete e;}
     if (mPointwiseRecorder) {delete mPointwiseRecorder;};
     if (mSurfaceRecorder) {delete mSurfaceRecorder;};
+    if (mWavefieldRecorder) {delete mWavefieldRecorder;};
     if (mSTF) {delete mSTF;}
     if (mMsgInfo) {delete mMsgInfo;}
     if (mMsgBuffer) {delete mMsgBuffer;}
@@ -186,6 +188,9 @@ void Domain::initializeRecorders() const {
     if (mSurfaceRecorder) {
         mSurfaceRecorder->initialize();
     }
+    if (mWavefieldRecorder) {
+        mWavefieldRecorder->initialize();
+    }
 }
 
 void Domain::finalizeRecorders() const {
@@ -204,7 +209,9 @@ void Domain::record(int tstep, Real t) const {
     if (mSurfaceRecorder) {
         mSurfaceRecorder->record(tstep, t);
     }
-    
+    if (mWavefieldRecorder) {
+        mWavefieldRecorder->record(t, mElements);
+    }
     #ifdef _MEASURE_TIMELOOP
         mTimerOthers->stop();
     #endif

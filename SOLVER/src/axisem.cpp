@@ -8,6 +8,7 @@
 #include "XMPI.h"
 #include "eigenc.h"
 #include "eigenp.h"
+#include "WavefieldRecorder.h"
 
 int axisem_main(int argc, char *argv[]) {
     
@@ -53,9 +54,9 @@ int axisem_main(int argc, char *argv[]) {
         
         //////// 3D models 
         MultilevelTimer::begin("Build 3D Models", 0);
-        Volumetric3D::buildInparam(pl.mVolumetric3D, *(pl.mParameters), pl.mExodusModel, 
-            srcLat, srcLon, srcDep, verbose);
-        Geometric3D::buildInparam(pl.mGeometric3D, *(pl.mParameters), verbose);
+        Volumetric3D::buildInparam(pl.mVolumetric3D, *(pl.mParameters), pl.mExodusModel,
+            pl.mVol2Geom3D, srcLat, srcLon, srcDep, verbose);
+        Geometric3D::buildInparam(pl.mGeometric3D, *(pl.mParameters), pl.mVol2Geom3D, verbose);
         OceanLoad3D::buildInparam(pl.mOceanLoad3D, *(pl.mParameters), verbose);
         MultilevelTimer::end("Build 3D Models", 0);
         
@@ -111,14 +112,6 @@ int axisem_main(int argc, char *argv[]) {
         // XMPI::barrier();
         // exit(0);
 
-        //////// output ABC Parameters
-        std::string s = pl.mMesh->ABC_verbose();
-        std::ofstream outABC;
-        outABC.open(Parameters::sOutputDirectory + "/ABCparams.txt");
-        outABC.write(s.c_str(),s.length());
-        XMPI::cout << pl.mMesh->ABC_verbose();
-
-
         //////// source time function
         MultilevelTimer::begin("Build Source Time Function", 0);
         STF::buildInparam(pl.mSTF, *(pl.mParameters), dt, verbose);
@@ -126,14 +119,16 @@ int axisem_main(int argc, char *argv[]) {
         
         //////// receivers
         MultilevelTimer::begin("Build Receivers", 0);
-        ReceiverCollection::buildInparam(pl.mReceivers, *(pl.mParameters), 
-            srcLat, srcLon, srcDep, pl.mSTF->getSize(), verbose);
-        MultilevelTimer::end("Build Receivers", 0);    
-        
+        ReceiverCollection::buildInparam(pl.mReceivers, *(pl.mParameters),
+            srcLat, srcLon, srcDep, pl.mSTF->getSize(), verbose, pl.mExodusModel->isCartesian());
+        WavefieldRecorder::buildInparam(pl.mWFR, *(pl.mParameters));
+        MultilevelTimer::end("Build Receivers", 0);
+
         //////// computational domain
         MultilevelTimer::begin("Computational Domain", 0);
         sv.mDomain = new Domain();
-        
+        MultilevelTimer::end("Computational Domain", 0);
+
         // release mesh
         MultilevelTimer::begin("Release Mesh", 1);
         pl.mMesh->release(*(sv.mDomain));
@@ -152,6 +147,7 @@ int axisem_main(int argc, char *argv[]) {
         // release receivers
         MultilevelTimer::begin("Release Receivers", 1);
         pl.mReceivers->release(*(sv.mDomain), *(pl.mMesh));
+        sv.mDomain->setWavefieldRecorder(pl.mWFR);
         MultilevelTimer::begin("Initialize Recorders", 2);
         sv.mDomain->initializeRecorders();
         MultilevelTimer::end("Initialize Recorders", 2);

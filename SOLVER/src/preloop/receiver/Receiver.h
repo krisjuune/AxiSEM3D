@@ -21,8 +21,8 @@ public:
     void release(PointwiseRecorder &recorderPW, const Domain &domain,
         int elemTag, const RDMatPP &interpFact);
 
-    bool locate(const Mesh &mesh, int &elemTag, RDMatPP &interpFact) const;
-    
+    bool locate(const Mesh &mesh, int &elemTag, RDMatPP &interpFact, bool cartesian) const;
+
     std::string verbose(bool geographic, int wname, int wnet) const;
     
     const std::string &getName() const {return mName;};

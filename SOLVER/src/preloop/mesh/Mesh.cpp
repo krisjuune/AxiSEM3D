@@ -45,9 +45,10 @@ mExModel(exModel), mNrField(nrf), mSrcLat(srcLat), mSrcLon(srcLon), mSrcDep(srcD
     mOceanLoad3D = 0;
     mDDPar = new DDParameters(par);
     mLearnPar = new LearnParameters(par);
-    mABCPar = new ABCParameters(par,mExModel);
+    mABCPar = new ABCParameters(par, mExModel);
     mU0_range = {100000,0};
     mVref_range = {100000,0};
+    mRecordingWF = (par.getValue<int>("OUT_WAVEFIELD_FRAMES") > 0);
 
     // 2D mode
     std::string mode2d = par.getValue<std::string>("MODEL_2D_MODE");
@@ -112,6 +113,12 @@ void Mesh::buildUnweighted() {
     MultilevelTimer::begin("Plot at Unweighted Phase", 1);
     for (const auto &sp: mSlicePlots) sp->plotUnweighted();
     MultilevelTimer::end("Plot at Unweighted Phase", 1);
+    // print summary for absorbing boundaries
+    XMPI::cout << ABC_verbose();
+    std::fstream abc;
+    abc.open(Parameters::sOutputDirectory + "/Vp5000-Vs" + std::to_string((int)(mVref_range(0))) + ".txt", std::fstream::out);
+    abc << ABC_verbose();
+    abc.close();
 }
 
 double Mesh::getDeltaT() const {
@@ -154,7 +161,7 @@ void Mesh::release(Domain &domain) {
     
     MultilevelTimer::begin("Release Elements", 2);
     for (int iloc = 0; iloc < getNumQuads(); iloc++) {
-        int etag = mQuads[iloc]->release(domain, mLocalElemToGLL[iloc], mAttBuilder);
+        int etag = mQuads[iloc]->release(domain, mLocalElemToGLL[iloc], mAttBuilder, mRecordingWF);
         mQuads[iloc]->setElementTag(etag);
     }
     MultilevelTimer::end("Release Elements", 2);
@@ -264,13 +271,15 @@ void Mesh::buildLocal(const DecomposeOption &option) {
     mSMax = mZMax = -1e30;
     mSMin = mZMin = 1e30;
     mQuads.reserve(mLocalElemToGLL.size());
+    XMPI::cout << "Generating quads...";
     for (int iquad = 0; iquad < mExModel->getNumQuads(); iquad++) {
         if (procMask(iquad)) {
             // 1D Quad
             Quad *quad = new Quad(*mExModel, iquad, *mNrField);
             // 3D model
-            quad->addVolumetric3D(mVolumetric3D, mSrcLat, mSrcLon, mSrcDep, mPhi2D);
-            quad->addGeometric3D(mGeometric3D, mSrcLat, mSrcLon, mSrcDep, mPhi2D);
+            int ABPosition = mExModel->getABPosition(iquad);
+            quad->addVolumetric3D(mVolumetric3D, mSrcLat, mSrcLon, mSrcDep, mPhi2D, ABPosition);
+            quad->addGeometric3D(mGeometric3D, mSrcLat, mSrcLon, mSrcDep, mPhi2D, ABPosition);
             if (mOceanLoad3D != 0) {
                 quad->setOceanLoad3D(*mOceanLoad3D, mSrcLat, mSrcLon, mSrcDep, mPhi2D);
             }    
@@ -285,24 +294,28 @@ void Mesh::buildLocal(const DecomposeOption &option) {
         }
     }
     MultilevelTimer::end("Generate Quads", 2);
-    
+    XMPI::cout << "done." << XMPI::endl;
+
     // setup GLL points
+    XMPI::cout << "Generating cardinal points...";
     MultilevelTimer::begin("Setup Points", 2);
     for (int iloc = 0; iloc < mLocalElemToGLL.size(); iloc++) {
-        mQuads[iloc]->setupGLLPoints(mGLLPoints, mLocalElemToGLL[iloc], mExModel->getDistTolerance(), mVref_range, mU0_range, mABCPar);
+        mQuads[iloc]->setupGLLPoints(mGLLPoints, mLocalElemToGLL[iloc], mExModel->getDistTolerance(), mExModel->isCartesian(),
+                            mVref_range, mU0_range, mABCPar);
     }
     MultilevelTimer::end("Setup Points", 2);
-    
+    XMPI::cout << "done." << XMPI::endl;
+
     /////////////////////////////// assemble mass and normal ///////////////////////////////
     MultilevelTimer::begin("Assemble Mass", 2);
     // mpi buffer
     std::vector<RDMatXX> bufferGLLSend;
     std::vector<RDMatXX> bufferGLLRecv;
-    for (int i = 0; i < mMsgInfo->mNProcComm; i++) {
+    for (int i = 0; i < mMsgInfo->mNProcComm; i++) { // for all processing nodes
         int nr_max = -1;
-        int npoint = mMsgInfo->mNLocalPoints[i];
+        int npoint = mMsgInfo->mNLocalPoints[i]; // number of points per node
         for (int j = 0; j < npoint; j++) {
-            int pTag = mMsgInfo->mILocalPoints[i][j];
+            int pTag = mMsgInfo->mILocalPoints[i][j]; // index of each point
             int nr = mGLLPoints[pTag]->getNr();
             nr_max = std::max(nr, nr_max);
         }
@@ -555,10 +568,11 @@ std::string Mesh::ABC_verbose() const {
     std::stringstream ss;
     ss << "\n=================== Absorbing Boundaries ===================" << std::endl;
     if (mExModel->hasABC()) {
-        ss << "  Number of Nodes      =   " << mABCPar->n << std::endl;
+        ss << "  Mesh Extended by     =   " << mABCPar->n << std::endl;
+        ss << "  Boundary Width (km)  =   " << mABCPar->width / 1000 << std::endl;
+        ss << "  Total Absorb. Elem.  =   " << mExModel->getNumQuads() - mExModel->getNumQuadsInner() << std::endl;
+        ss << "  Total Normal Elem.   =   " << mExModel->getNumQuadsInner() << std::endl;
         ss << "  Att. Multiplier      =   " << mABCPar->Ufac << std::endl;
-        ss << std::endl;
-        ss << "  Boundary Width       =   " << mABCPar->width << std::endl;
         ss << "  Reference Velocities =   " << mVref_range[0] << " ... " << mVref_range[1] << std::endl;
         ss << "  Max. Attenuations    =   " << mU0_range[0] << " ... " << mU0_range[1] << std::endl;
     } else {
@@ -569,9 +583,9 @@ std::string Mesh::ABC_verbose() const {
 }
 
 Mesh::DDParameters::DDParameters(const Parameters &par) {
-    mReportMeasure = par.getValue<bool>("DEVELOP_MEASURED_COSTS");
-    mProcInterval = par.getValue<int>("DD_PROC_INTERVAL");
-    mNCutsPerProc = par.getValue<int>("DD_NCUTS_PER_PROC");
+    mReportMeasure = par.getValue<bool>("DEVELOP_MEASURED_COSTS"); //output cost measurements
+    mProcInterval = par.getValue<int>("DD_PROC_INTERVAL"); // min number of processors per processing node (default 1)
+    mNCutsPerProc = par.getValue<int>("DD_NCUTS_PER_PROC"); // max number of processing noder per processor (default 1)
     if (mProcInterval <= 0) {
         mProcInterval = 1;
     }

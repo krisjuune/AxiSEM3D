@@ -21,8 +21,8 @@
 #include "Quad.h"
 
 ReceiverCollection::ReceiverCollection(const std::string &fileRec, bool geographic,
-    double srcLat, double srcLon, double srcDep, int duplicated, bool saveSurf, bool kmconv):
-mInputFile(fileRec), mGeographic(geographic), mSaveWholeSurface(saveSurf),
+    double srcLat, double srcLon, double srcDep, int duplicated, bool saveSurf, bool cartesian):
+mInputFile(fileRec), mGeographic(geographic), mCartesian(cartesian), mSaveWholeSurface(saveSurf),
 mSrcLat(srcLat), mSrcLon(srcLon), mSrcDep(srcDep) {
     std::vector<std::string> name, network;
     std::vector<double> theta, phi, depth;
@@ -89,7 +89,7 @@ mSrcLat(srcLat), mSrcLon(srcLon), mSrcDep(srcDep) {
         recKeys.push_back(key);
         // add receiver
         mReceivers.push_back(new Receiver(name[i], network[i],
-            theta[i], phi[i], geographic, depth[i], srcLat, srcLon, srcDep, kmconv));
+            theta[i], phi[i], geographic, depth[i], srcLat, srcLon, srcDep, mCartesian));
         mWidthName = std::max(mWidthName, (int)name[i].length());
         mWidthNetwork = std::max(mWidthNetwork, (int)network[i].length());
     }
@@ -108,7 +108,7 @@ void ReceiverCollection::release(Domain &domain, const Mesh &mesh) {
     std::vector<int> recETag(mReceivers.size(), -1);
     std::vector<RDMatPP> recInterpFact(mReceivers.size(), RDMatPP::Zero());
     for (int irec = 0; irec < mReceivers.size(); irec++) {
-        bool found = mReceivers[irec]->locate(mesh, recETag[irec], recInterpFact[irec]);
+        bool found = mReceivers[irec]->locate(mesh, recETag[irec], recInterpFact[irec], mCartesian);
         if (found) {
             recRank[irec] = XMPI::rank();
         }
@@ -179,7 +179,7 @@ std::string ReceiverCollection::verbose() const {
 }
 
 void ReceiverCollection::buildInparam(ReceiverCollection *&rec, const Parameters &par,
-    double srcLat, double srcLon, double srcDep, int totalStepsSTF, bool kmconv, int verbose) {
+    double srcLat, double srcLon, double srcDep, int totalStepsSTF, bool cartesian, int verbose) {
     if (rec) {
         delete rec;
     }
@@ -210,7 +210,7 @@ void ReceiverCollection::buildInparam(ReceiverCollection *&rec, const Parameters
     }
     bool saveSurf = par.getValue<bool>("OUT_STATIONS_WHOLE_SURFACE");
     rec = new ReceiverCollection(recFile, geographic, srcLat, srcLon, srcDep,
-        duplicated, saveSurf, kmconv);
+        duplicated, saveSurf, cartesian);
 
     // options
     rec->mRecordInterval = par.getValue<int>("OUT_STATIONS_RECORD_INTERVAL");

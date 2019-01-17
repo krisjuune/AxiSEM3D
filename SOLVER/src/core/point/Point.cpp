@@ -5,9 +5,7 @@
 #include "Point.h"
 
 Point::Point(int nr, bool axial, const RDCol2 &crds):
-mNr(nr), mNu(nr / 2), mAxial(axial), mCoords(crds) {
-    mIsFS = false;
-}
+mNr(nr), mNu(nr / 2), mAxial(axial), mCoords(crds) {}
 
 void Point::scatterDisplToElement(vec_ar3_CMatPP &displ, int ipol, int jpol, int maxNu) const {
     throw std::runtime_error("Point::scatterDisplToElement || Incompatible point type.");

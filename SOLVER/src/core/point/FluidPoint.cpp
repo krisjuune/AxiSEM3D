@@ -6,8 +6,8 @@
 #include "Mass.h"
 #include "MultilevelTimer.h"
 
-FluidPoint::FluidPoint(int nr, bool axial, const RDCol2 &crds, Mass *mass):
-Point(nr, axial, crds), mMass(mass) {
+FluidPoint::FluidPoint(int nr, bool axial, const RDCol2 &crds, Mass *mass, bool fluidSurf, const double gamma):
+Point(nr, axial, crds), mMass(mass), mFluidSurf(fluidSurf), mGamma(gamma) {
     mDispl = CColX::Zero(mNu + 1, 1);
     mVeloc = CColX::Zero(mNu + 1, 1);
     mAccel = CColX::Zero(mNu + 1, 1);
@@ -22,7 +22,13 @@ FluidPoint::~FluidPoint() {
 
 void FluidPoint::updateNewmark(Real dt) {
     // calculate new acceleration
-      // mask stiff
+
+    if(mFluidSurf) {
+      resetZero();
+      return;
+    }
+
+    // mask stiff
     maskField(mStiff);
       // compute accel inplace
     mMass->computeAccel(mStiff);

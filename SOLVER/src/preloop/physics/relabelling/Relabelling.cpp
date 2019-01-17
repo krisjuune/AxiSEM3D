@@ -29,24 +29,44 @@ mMyQuad(quad) {
     }
 }
 
-void Relabelling::addUndulation(const std::vector<Geometric3D *> &g3D, 
-    double srcLat, double srcLon, double srcDep, double phi2D) {
+void Relabelling::addUndulation(const std::vector<Geometric3D *> &g3D,
+    double srcLat, double srcLon, double srcDep, double phi2D,
+    const int ABPosition) {
     if (g3D.size() == 0) {
         return;
-    }    
-    double rElemCenter = mMyQuad->computeCenterRadius();
+    }
+
+    RDCol2 szCenter = mMyQuad->mapping(RDCol2::Zero());
     int Nr = mMyQuad->getNr();
     for (int ipol = 0; ipol <= nPol; ipol++) {
         for (int jpol = 0; jpol <= nPol; jpol++) {
+
+            if (ABPosition == 1) { // right boundary
+                ipol = nPol;
+            } else if (ABPosition == 2) { //lower boundary
+                jpol = nPol;
+            } else if (ABPosition == 3) { //corner
+                ipol = nPol;
+                jpol = nPol;
+            }
+
             int ipnt = ipol * nPntEdge + jpol;
             const RDCol2 &xieta = SpectralConstants::getXiEta(ipol, jpol, mMyQuad->isAxial());
-            const RDMatX3 &rtpS = mMyQuad->computeGeocentricGlobal(srcLat, srcLon, srcDep, xieta, Nr, phi2D);
-            for (int alpha = 0; alpha < Nr; alpha++) {
-                double r = rtpS(alpha, 0);
-                double t = rtpS(alpha, 1);
-                double p = rtpS(alpha, 2);
-                for (const auto &model: g3D) {
-                    mStiff_dZ(alpha, ipnt) += model->getDeltaR(r, t, p, rElemCenter); 
+            for (const auto &model: g3D) {
+                RDMatX3 rtpS;
+                double rElemCenter;
+                if (model->isCartesian()) {
+                    rtpS = mMyQuad->computeCartesian(xieta, Nr, phi2D); // r s phi
+                    rElemCenter = szCenter(1);
+                } else {
+                    rtpS = mMyQuad->computeGeocentricGlobal(srcLat, srcLon, srcDep, xieta, Nr, phi2D);
+                    rElemCenter = szCenter.norm();
+                }
+                for (int alpha = 0; alpha < Nr; alpha++) {
+                    double r = rtpS(alpha, 0);
+                    double t = rtpS(alpha, 1);
+                    double p = rtpS(alpha, 2);
+                    mStiff_dZ(alpha, ipnt) += model->getDeltaR(r, t, p, rElemCenter);
                 }
             }
         }

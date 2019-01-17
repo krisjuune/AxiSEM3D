@@ -19,7 +19,7 @@
 Receiver::Receiver(const std::string &name, const std::string &network,
     double theta_lat, double phi_lon, bool geographic,
     double depth, double srcLat, double srcLon, double srcDep,
-    bool kmconv):
+    bool cartesian):
 mName(name), mNetwork(network), mDepth(depth) {
     RDCol3 rtpG, rtpS;
     if (geographic) {
@@ -29,7 +29,7 @@ mName(name), mNetwork(network), mDepth(depth) {
         rtpS = Geodesy::rotateGlob2Src(rtpG, srcLat, srcLon, srcDep);
     } else {
         rtpS(0) = 1.;
-        if (kmconv) {
+        if (cartesian) {
           rtpS(1) = theta_lat * 1000 / Geodesy::getROuter();
         } else {
           rtpS(1) = theta_lat * degree;
@@ -54,17 +54,21 @@ void Receiver::release(PointwiseRecorder &recorderPW, const Domain &domain,
         mLat, mLon, mDepth);
 }
 
-bool Receiver::locate(const Mesh &mesh, int &elemTag, RDMatPP &interpFact) const {
+bool Receiver::locate(const Mesh &mesh, int &elemTag, RDMatPP &interpFact, bool cartesian) const {
     RDCol2 recCrds, srcXiEta;
     double r = mesh.computeRadiusRef(mDepth, mLat, mLon);
     recCrds(0) = r * sin(mTheta);
     recCrds(1) = r * cos(mTheta);
+    if (cartesian) {
+        recCrds(1) = mesh.computeRadiusRef(mDepth, mLat, mLon);
+    }
     if (recCrds(0) > mesh.sMax() + tinySingle || recCrds(0) < mesh.sMin() - tinySingle) {
         return false;
     }
     if (recCrds(1) > mesh.zMax() + tinySingle || recCrds(1) < mesh.zMin() - tinySingle) {
         return false;
     }
+    bool testSFBoundary = false;
     for (int iloc = 0; iloc < mesh.getNumQuads(); iloc++) {
         const Quad *quad = mesh.getQuad(iloc);
         if (!quad->nearMe(recCrds(0), recCrds(1))) {
@@ -80,10 +84,18 @@ bool Receiver::locate(const Mesh &mesh, int &elemTag, RDMatPP &interpFact) const
                 XMath::interpLagrange(srcXiEta(1), nPntEdge, 
                     SpectralConstants::getP_GLL().data(), interpEta.data());
                 interpFact = interpXi * interpEta.transpose();
-                return true;
+                if (quad->isFluid() && quad->onSFBoundary()) {
+                    testSFBoundary = true;
+                    continue;
+                } else {
+                    return true;
+                };
             }
         }
     }
+    if (testSFBoundary) {
+        return true;
+    };
     return false;
 }
 

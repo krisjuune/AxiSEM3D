@@ -92,10 +92,11 @@ int GLLPoint::release(Domain &domain) const {
             const RDColX &invMass = mMassFluid.array().pow(-1.).matrix(); 
             mass = new Mass3D(invMass.cast<Real>());
         }
-        fluid = new FluidPoint(mNr, mIsAxial, mCoords, mass, mGamma);
+        fluid = new FluidPoint(mNr, mIsAxial, mCoords, mass, mOnSurface, mGamma);
     }
     
     // released as different point classes
+    SolidFluidPoint *sfpoint;
     if (isSolid && isFluid) {
         SFCoupling *couple;
         if (XMath::equalRows(mSFNormal_assmble) && XMath::equalRows(mMassFluid)) {

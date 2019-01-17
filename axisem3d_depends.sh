@@ -6,7 +6,7 @@
 
 ############################## edit within this box ##############################
 # installation path of conda
-export MY_CONDA_INSTALL_DIR=$HOME/anaconda
+export MY_CONDA_INSTALL_DIR=/disks/data1/.anaconda3/envs/mpi
 
 # your bash_profile
 # Mac OS X default
@@ -16,11 +16,11 @@ export MY_BASH_PROFILE_UBT=$HOME/.bashrc
 
 # What do you have already? And where are they?
 # boost
-export MY_BOOST_READY=false
-export MY_BOOST_DIR=""
+export MY_BOOST_READY=true
+export MY_BOOST_DIR=$MY_CONDA_INSTALL_DIR
 # eigen3 (make sure it is above 3.3-rc1, very important)
-export MY_EIGEN3_READY=false
-export MY_EIGEN3_DIR=""
+export MY_EIGEN3_READY=true
+export MY_EIGEN3_DIR=$HOME/Programs/AxiSEM3D/axisem3d_depends/eigen3
 # fftw (make sure it contains both double- and single-precision)
 export MY_FFTW_READY=false
 export MY_FFTW_DIR=""
@@ -32,8 +32,8 @@ export MY_NETCDF_READY=false
 export MY_NETCDF_DIR=""
 
 # where you would like to download boost and eigen3
-export BOOST_INSTALL_DIR=$HOME/axisem3d_depends/boost 
-export EIGEN3_INSTALL_DIR=$HOME/axisem3d_depends/eigen3 
+export BOOST_INSTALL_DIR=$HOME/Programs/AxiSEM3D/axisem3d_depends/boost 
+export EIGEN3_INSTALL_DIR=$HOME/Programs/AxiSEM3D/axisem3d_depends/eigen3 
 ############################## edit within this box ##############################
 
 ##### Boost #####

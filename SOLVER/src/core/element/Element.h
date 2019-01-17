@@ -51,10 +51,8 @@ public:
     
     // axial
     bool axial() const;
-    
-    virtual bool fluid() const {
-        throw std::runtime_error("Element::fluid || Error.");
-    };
+
+    virtual bool fluid() const {return false;};
 
     virtual Acoustic * getAcoustic() const {
         throw std::runtime_error("Element::getAcoustic || Error.");
@@ -62,7 +60,16 @@ public:
 
     // form theta for TIso
     RDMatPP formThetaMat() const;
-    
+
+    // for wavefield recorder
+    void addWFRweights(RDMatPP weights, RDCol2 crds, RDMatXN dz) {
+        mWFRweights = weights;
+        mCenterCrds = crds;
+        mDz = dz;
+    }
+    RRow3 recordWF(const double phi) const;
+    RDCol2 getCenterCrds(const double phi) const;
+
 protected:
     int mMaxNu;
     int mMaxNr;
@@ -73,6 +80,10 @@ protected:
     // flags
     bool mHasPRT;
     
+    RDMatPP mWFRweights;
+    RDCol2 mCenterCrds;
+    RDMatXN mDz;
+
 public:
     // domain tag, mainly for debug
     void setDomainTag(int tag) {mDomainTag = tag;};

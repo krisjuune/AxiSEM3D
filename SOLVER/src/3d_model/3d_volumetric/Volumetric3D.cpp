@@ -7,8 +7,10 @@
 
 #include "XMPI.h"
 #include "Parameters.h"
+#include "AutoGeometricParams.h"
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string.hpp>
+#include <iostream>
 
 /////////////////////////////// user-defined models here
 #include "Volumetric3D_s20rts.h"
@@ -17,10 +19,11 @@
 #include "Volumetric3D_bubble.h"
 #include "Volumetric3D_cylinder.h"
 #include "Volumetric3D_EMC.h"
+#include "Volumetric3D_SEG.h"
 /////////////////////////////// user-defined models here
 
-void Volumetric3D::buildInparam(std::vector<Volumetric3D *> &models, 
-    const Parameters &par, const ExodusModel *exModel, 
+void Volumetric3D::buildInparam(std::vector<Volumetric3D *> &models,
+    const Parameters &par, const ExodusModel *exModel, std::vector<AutoGeometricParams *> &Vol2GeoModels,
     double srcLat, double srcLon, double srcDep, int verbose) {
     
     // clear the container
@@ -61,8 +64,10 @@ void Volumetric3D::buildInparam(std::vector<Volumetric3D *> &models,
             m = new Volumetric3D_cylinder();        
         } else if (boost::iequals(name, "emc")) {
             m = new Volumetric3D_EMC();
-            
-        /////////////////////////////// 
+        } else if (boost::iequals(name, "SEG_C3NA")) {
+            m = new Volumetric3D_SEG();
+
+        ///////////////////////////////
         // user-defined models here
         /////////////////////////////// 
             
@@ -76,7 +81,10 @@ void Volumetric3D::buildInparam(std::vector<Volumetric3D *> &models,
         m->setupExodusModel(exModel);
         m->initialize(params);
         models.push_back(m);
-        
+
+        // SEG-model autogenerates ocean floor relabelling
+        m->modelBathymetry(Vol2GeoModels);
+
         // verbose
         if (verbose) {
             XMPI::cout << m->verbose();

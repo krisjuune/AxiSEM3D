@@ -25,6 +25,7 @@ public:
     bool isIsotropic() const {return mElementalVariables.find("VP_0") != mElementalVariables.end();};
     bool hasAttenuation() const {return mGlobalVariables.find("nr_lin_solids") != mGlobalVariables.end();};
     int getNumQuads() const {return mConnectivity.rows();};
+    int getNumQuadsInner() const {return mNumQuadsInner;};
     int getNumNodes() const {return mNodalS.rows();};
     double getROuter() const {
       try {
@@ -32,13 +33,15 @@ public:
       } catch (...) {return 6371000.0;}
     };
     bool isCartesian() const {return mGlobalRecords.at("crdsys") != "spherical";};
-    bool hasABC() const {return (isCartesian() && mN_ABC > 0);}
+    bool hasABC() const {return (isCartesian() && mHasABC);}
     double getDistTolerance() const {return mDistTolerance;};
     double getHmax() const {return mHmax;};
+    double getHmin() const {return mHmin;};
     RDCol2 getBoundaries() const {
       RDCol2 b(mNodalS.maxCoeff(),mNodalZ.minCoeff());
       return b;
     }
+    double getMeshedOcean() const {return mMeshedOceanDepth;};
 
     // Node-wise
     double getNodalS(int nodeTag) const {return mNodalS(nodeTag);};
@@ -62,7 +65,12 @@ public:
     const IMatX4 &getConnectivity() const {return mConnectivity;};
     IRow4 getConnectivity(int quadTag) const {return mConnectivity.row(quadTag);};
     IRow4 getVicinalAxis(int quadTag) const {return mVicinalAxis.row(quadTag);};
-    int isABQuad(int quadTag) const {return mABfield[quadTag](0);};
+
+    int getNumAbsElements() const {return mN_ABC;};
+    bool isABQuad(int quadTag) const {return (mABfield(quadTag, 1) > 0);};
+    int getCopyTagAB(int quadTag) const {return mABfield(quadTag, 0);};
+    int getABPosition(int quadTag) const {return mABfield(quadTag, 1);}; // 0 = edge of normal mesh; 1 = right ab boundary; 2 = lower ab boundary; 3 = ab corner
+    double getABVmax() const {return mABC_Vmax;};
 
     std::string verbose() const;
     
@@ -128,8 +136,12 @@ private:
     double mDistTolerance;
 
     // for ABCs
-    double mHmax, mVp_min;
-    int mN_ABC;
-    int mNumQuadsInner, mNumNodesInner;
-    std::vector<IRow2> mABfield;
+    bool mHasABC;
+    double mHmax, mHmin, mTSource;
+    double mABC_Vmax = -1;
+    int mN_ABC, mNumQuadsInner, mNumNodesInner;
+    IMatX2 mABfield;
+
+    // for automated oceantopography
+    double mMeshedOceanDepth = 0;
 };
