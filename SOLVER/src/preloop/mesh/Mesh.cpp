@@ -116,7 +116,7 @@ void Mesh::buildUnweighted() {
     // print summary for absorbing boundaries
     XMPI::cout << ABC_verbose();
     std::fstream abc;
-    abc.open(Parameters::sOutputDirectory + "/Vp5000-Vs" + std::to_string((int)(mVref_range(0))) + ".txt", std::fstream::out);
+    abc.open(Parameters::sOutputDirectory + "/ABCParams.txt", std::fstream::out);
     abc << ABC_verbose();
     abc.close();
 }

@@ -122,10 +122,6 @@ mQuadTag(quadTag) {
         }
     }
 
-    // solid-fluid boundary
-    ///////////////////////////////////////////////
-    ////// this piece of code is correct and more general,
-    ////// which should be re-enabled after fixing the issue in mesher
     mOnSFBoundary = false;
     mSFSide = exModel.getSideSolidFluid(mQuadTag);
     if (mSFSide >= 0) {
@@ -142,63 +138,6 @@ mQuadTag(quadTag) {
             }
         }
     }
-    ///////////////////////////////////////////////
-    
-    ///////////////////////////////////////////////
-    ////// this piece of code is temporary
-    // change radius of CMB and ICB if necessary
-    // double rCMB = exModel.getR_CMB();
-    // double rICB = exModel.getR_ICB();
-    // 
-    // // init
-    // mOnSFBoundary = false;
-    // mSFSide = -1;
-    // 
-    // // vertex radius
-    // double r0 = mNodalCoords.col(0).norm();
-    // double r1 = mNodalCoords.col(1).norm();
-    // double r2 = mNodalCoords.col(2).norm();
-    // double r3 = mNodalCoords.col(3).norm();
-    // 
-    // // CMB
-    // if (std::abs(r0 - rCMB) < distTol && std::abs(r1 - rCMB) < distTol) {
-    //     mOnSFBoundary = true;
-    //     mSFSide = 0;
-    // }
-    // if (std::abs(r1 - rCMB) < distTol && std::abs(r2 - rCMB) < distTol) {
-    //     mOnSFBoundary = true;
-    //     mSFSide = 1;
-    // }
-    // if (std::abs(r2 - rCMB) < distTol && std::abs(r3 - rCMB) < distTol) {
-    //     mOnSFBoundary = true;
-    //     mSFSide = 2;
-    // }
-    // if (std::abs(r3 - rCMB) < distTol && std::abs(r0 - rCMB) < distTol) {
-    //     mOnSFBoundary = true;
-    //     mSFSide = 3;
-    // }
-    // 
-    // // ICB
-    // if (std::abs(r0 - rICB) < distTol && std::abs(r1 - rICB) < distTol) {
-    //     mOnSFBoundary = true;
-    //     mSFSide = 0;
-    // }
-    // if (std::abs(r1 - rICB) < distTol && std::abs(r2 - rICB) < distTol) {
-    //     mOnSFBoundary = true;
-    //     mSFSide = 1;
-    // }
-    // if (std::abs(r2 - rICB) < distTol && std::abs(r3 - rICB) < distTol) {
-    //     mOnSFBoundary = true;
-    //     mSFSide = 2;
-    // }
-    // if (std::abs(r3 - rICB) < distTol && std::abs(r0 - rICB) < distTol) {
-    //     mOnSFBoundary = true;
-    //     mSFSide = 3;
-    // }
-    
-    
-    ///////////////////////////////////////////////
-
 
     // surface boundary
     mOnSurface = false;
@@ -324,20 +263,6 @@ double Quad::getDeltaT() const {
     
     // we have checked this in relabelling
     return dt_min_org;
-    
-    // int denseFactor = 11;
-    // // check minimum on densed sampling slices
-    // double dt_min_all = XMath::trigonResampling(denseFactor * dt_slices.rows(), dt_slices).minCoeff();
-    // if (dt_min_all < .0) {
-    //     throw std::runtime_error("Quad::getDeltaT || Strong Gibbs phenomenon detected. ||"
-    //         "This exception means your 3-D models (usually of Geometric type, e.g., Moho undulation) ||"
-    //         "contain very strong and sharp gradients such as a spike. The Gibbs phenomenon is too ||"
-    //         "strong to be handled by AxiSEM3D and will definitely cause instability. ||"
-    //         "Please try to smooth the problematic model externally.");
-    // }
-    // 
-    // // return average of the two
-    // return (dt_min_org + dt_min_all) / 2.;
 }
 
 void Quad::setupGLLPoints(std::vector<GLLPoint *> &gllPoints, const IMatPP &myPointTags,
@@ -350,7 +275,6 @@ void Quad::setupGLLPoints(std::vector<GLLPoint *> &gllPoints, const IMatPP &myPo
     if (mIsABQuad) {
         Vref3D = mMaterial->get3DVelocity();
     }
-    //TestOut.open(Parameters::sOutputDirectory + "/gamma.txt", std::fstream::app);
     for (int ipol = 0; ipol <= nPol; ipol++) {
         for (int jpol = 0; jpol <= nPol; jpol++) {
             int ipnt = ipol * nPntEdge + jpol;
@@ -406,7 +330,7 @@ void Quad::setupGLLPoints(std::vector<GLLPoint *> &gllPoints, const IMatPP &myPo
                 double dist = std::sqrt(std::min({s_dist,z_dist}));
 
                 //double U0 = ABCPar->Ufac * Vref3D(ipnt) / (2 * ABCPar->Hmax);
-                double U0 = 0 * ABCPar->Ufac;
+                double U0 = 100 * ABCPar->Ufac;
                 double gamma = U0 * (1 - sin(pi * dist / (2 * ABCPar->width)) * sin(pi * dist / (2 * ABCPar->width)));
                 gllPoints[pointTag]->addGamma(gamma);
                 //TestOut << crds(0) << "," << crds(1) << "," << gamma << "/n";

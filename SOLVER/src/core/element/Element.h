@@ -67,7 +67,6 @@ public:
     // reset
     virtual void resetZero() {};
 
-
     // for wavefield recorder
     void addWFRweights(RDMatPP weights, RDCol2 crds, RDMatXN dz) {
         mWFRweights = weights;

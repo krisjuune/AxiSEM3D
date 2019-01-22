@@ -43,9 +43,6 @@ mName(name), mNetwork(network), mDepth(depth), mDumpStrain(dumpStrain), mDumpCur
     mLat = Geodesy::theta2Lat_d(rtpG(1), mDepth);
     mLon = Geodesy::phi2Lon(rtpG(2));
     mBackAzimuth = Geodesy::backAzimuth(srcLat, srcLon, srcDep, mLat, mLon, mDepth);
-    // // test
-    // XMPI::cout << name << " " << network << " ";
-    // XMPI::cout << mLat << " " << mLon << " " << " 0.0 " << mDepth << XMPI::endl;
 }
 
 void Receiver::release(PointwiseRecorder &recorderPW, const Domain &domain,

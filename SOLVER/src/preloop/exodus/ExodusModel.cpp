@@ -265,8 +265,6 @@ void ExodusModel::formAuxiliary() {
                 it->second(axialQuad) = Mapping::period0123(it->second(axialQuad) - shift);
             }
         }
-    // done
-    // mSideSets.at(mSSNameAxis)(axialQuad) = 3;
     }
     MultilevelTimer::end("Process Exodus Axis", 2);
 
@@ -388,25 +386,6 @@ void ExodusModel::formAuxiliary() {
         double vs = mElementalVariables.at(strVs)(iQuad);
     }
     MultilevelTimer::end("Process Exodus Check Ocean", 2);
-
-    // CMB and ICB
-    // MultilevelTimer::begin("Process Exodus CMB & ICB", 2);
-    // mR_CMB = DBL_MIN;
-    // mR_ICB = DBL_MAX;
-    // for (int i = 0; i < getNumQuads(); i++) {
-    //     bool isFluid = getElementalVariables("fluid", i) > .5;
-    //     bool isAxis = getSideAxis(i) >= 0;
-    //     if (isFluid && isAxis) {
-    //         for (int j = 0; j < 4; j++) {
-    //             double s = mNodalS(mConnectivity(i, j));
-    //             double z = mNodalZ(mConnectivity(i, j));
-    //             double r = std::sqrt(s * s + z * z);
-    //             mR_CMB = std::max(mR_CMB, r);
-    //             mR_ICB = std::min(mR_ICB, r);
-    //         }
-    //     }
-    // }
-    // MultilevelTimer::end("Process Exodus CMB & ICB", 2);
 }
 
 void ExodusModel::AddAbsorbingBoundaryElements() {
@@ -416,7 +395,7 @@ void ExodusModel::AddAbsorbingBoundaryElements() {
             mABC_Vmax = std::max(mABC_Vmax, mElementalVariables.at(vname).maxCoeff());
         }
     }
-    if (mN_ABC <= 0) {mN_ABC = int(6 * mTSource * mABC_Vmax / mHmax);}
+    if (mN_ABC <= 0) {mN_ABC = round(6 * mTSource * mABC_Vmax / mHmax);}
 
     // right boundary
     int nQuads = getNumQuads();
