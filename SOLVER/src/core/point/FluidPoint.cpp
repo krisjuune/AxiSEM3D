@@ -5,9 +5,10 @@
 #include "FluidPoint.h"
 #include "Mass.h"
 #include "MultilevelTimer.h"
+#include "ABC.h"
 
-FluidPoint::FluidPoint(int nr, bool axial, const RDCol2 &crds, Mass *mass, bool fluidSurf, const double gamma):
-Point(nr, axial, crds), mMass(mass), mFluidSurf(fluidSurf), mGamma(gamma) {
+FluidPoint::FluidPoint(int nr, bool axial, const RDCol2 &crds, Mass *mass, const bool fluidSurf, 
+    ABC *ABC): Point(nr, axial, crds), mMass(mass), mFluidSurf(fluidSurf), mABC(ABC) {
     mDispl = CColX::Zero(mNu + 1, 1);
     mVeloc = CColX::Zero(mNu + 1, 1);
     mAccel = CColX::Zero(mNu + 1, 1);
@@ -27,7 +28,9 @@ void FluidPoint::updateNewmark(Real dt) {
       resetZero();
       return;
     }
-
+    
+    if (mABC) mStiff += mABC->StaceyTraction(mVeloc);
+    
     // mask stiff
     maskField(mStiff);
       // compute accel inplace
@@ -37,14 +40,15 @@ void FluidPoint::updateNewmark(Real dt) {
     // update dt
     Real half_dt = half * dt;
     Real half_dt_dt = half_dt * dt;
+    
+    // damp acceleration in sponge boundary
+    if (mABC) mABC->applyKosloffDamping(mStiff, mVeloc, mDispl);
+    
     // update velocity and old acceleration
     mVeloc += half_dt * (mAccel + mStiff);
     mAccel = mStiff;
     // update displacement
     mDispl += dt * mVeloc + half_dt_dt * mAccel;
-
-    // absorbing boundaries
-    mAccel -= 2 * mGamma * mVeloc + mGamma * mGamma * mDispl;
 
     // zero stiffness for next time step
     mStiff.setZero();

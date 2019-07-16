@@ -11,7 +11,7 @@ NrField(useLucky), mParameters(params) {
     // nothing
 }
 
-int UserNrField::getNrAtPoint(const RDCol2 &coords) const {
+int UserNrField::getNrAtPointInternal(const RDCol2 &coords) const {
     // input: coordinates
     // s, z, r, theta, depth
     double s = coords(0);

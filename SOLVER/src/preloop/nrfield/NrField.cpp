@@ -7,18 +7,27 @@
 #include "EmpNrField.h"
 #include "WisdomNrField.h"
 #include "UserNrField.h"
+#include "ExodusModel.h"
 
 #include "Parameters.h"
 #include "XMPI.h"
 #include <boost/algorithm/string.hpp>
 
-void NrField::buildInparam(NrField *&nrf, const Parameters &par, int verbose) {
+bool NrField::mHasLowOrderExt = false;
+RDCol2 NrField::mInnerBoundaries = RDCol2::Zero();
+int NrField::mExtNu = 0;
+
+void NrField::buildInparam(NrField *&nrf, const Parameters &par, const ExodusModel *exModel, int verbose) {
     if (nrf) {
         delete nrf;
     }
     
     std::string type = par.getValue<std::string>("NU_TYPE");
     bool useLucky = par.getValue<bool>("FFTW_LUCKY_NUMBER");
+    
+    mHasLowOrderExt = (exModel->hasExtension() & !exModel->hasSpongeABC());
+    mInnerBoundaries = exModel->getInnerBoundaries();
+    mExtNu = par.getValue<int>("EXTENSION_ORDER");
     
     if (boost::iequals(type, "constant")) {
         int nu = par.getValue<int>("NU_CONST");
@@ -61,4 +70,12 @@ void NrField::buildInparam(NrField *&nrf, const Parameters &par, int verbose) {
     if (verbose) {
         XMPI::cout << nrf->verbose();
     }
+}
+
+int NrField::getNrAtPoint(const RDCol2 &coords) const {
+    int nr = getNrAtPointInternal(coords);
+    if (mHasLowOrderExt && (coords(0) > mInnerBoundaries(0) || coords(1) < mInnerBoundaries(1))) {
+        nr = std::min({2 * mExtNu + 1, nr});
+    }
+    return nr;
 }

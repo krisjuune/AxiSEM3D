@@ -38,9 +38,13 @@ void Parameters::registerAll() {
     registerPar("MODEL_PLOT_SLICES_NUM");
     registerPar("MODEL_PLOT_SLICES_LIST");
     registerPar("ATTENUATION");
-    registerPar("ABSORBING_BOUNDARIES");
-    registerPar("ABC_ELEMENTS");
-    registerPar("ABC_FACTOR");
+    registerPar("SPONGE_BOUNDARIES");
+    registerPar("SPONGE_WIDTH");
+    registerPar("SPONGE_ABSORBING_FACTOR");
+    registerPar("STACEY_BOUNDARIES");
+    registerPar("LOW-ORDER_EXTENSION");
+    registerPar("EXTENSION_WIDTH");
+    registerPar("EXTENSION_ORDER");
 
     // inparam.nu
     registerPar("NU_TYPE");

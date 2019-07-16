@@ -140,6 +140,6 @@ RRow3 Element::recordWF(const double phi) const {
 RDCol2 Element::getCenterCrds(const double phi) const {
     RDCol2 crds;
     RDRowN dz = XMath::computeFourierAtPhi(mDz, phi);
-    crds << mCenterCrds(0), mCenterCrds(1) + dz(int((nPE-1)/2));
+    crds << mCenterCrds(0), mCenterCrds(1) + dz(round((nPE-1)/2));
     return crds;
 }

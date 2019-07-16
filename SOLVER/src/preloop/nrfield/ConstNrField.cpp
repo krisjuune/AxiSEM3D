@@ -12,7 +12,7 @@ NrField(useLucky), mNu(nu) {
     }
 }
 
-int ConstNrField::getNrAtPoint(const RDCol2 &coords) const {
+int ConstNrField::getNrAtPointInternal(const RDCol2 &coords) const {
     int nr = 2 * mNu + 1;
     return nr;
 }

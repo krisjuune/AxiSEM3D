@@ -33,7 +33,9 @@ public:
       } catch (...) {return 6371000.0;}
     };
     bool isCartesian() const {return mGlobalRecords.at("crdsys") != "spherical";};
-    bool hasABC() const {return (isCartesian() && mHasABC);}
+    bool hasStaceyABC() const {return (isCartesian() && mHasStaceyABC);}
+    bool hasSpongeABC() const {return (isCartesian() && mHasSpongeABC);}
+    bool hasExtension() const {return (isCartesian() && mHasExtension);}
     double getDistTolerance() const {return mDistTolerance;};
     double getHmax() const {return mHmax;};
     double getHmin() const {return mHmin;};
@@ -41,6 +43,7 @@ public:
       RDCol2 b(mNodalS.maxCoeff(),mNodalZ.minCoeff());
       return b;
     }
+    RDCol2 getInnerBoundaries() const {return mInnerBoundaries;};
     double getMeshedOcean() const {return mMeshedOceanDepth;};
 
     // Node-wise
@@ -67,7 +70,7 @@ public:
     IRow4 getVicinalAxis(int quadTag) const {return mVicinalAxis.row(quadTag);};
 
     int getNumAbsElements() const {return mN_ABC;};
-    bool isABQuad(int quadTag) const {return (mABfield(quadTag, 1) > 0);};
+    bool isExtQuad(int quadTag) const {return (mABfield(quadTag, 1) > 0);};
     int getCopyTagAB(int quadTag) const {return mABfield(quadTag, 0);};
     int getABPosition(int quadTag) const {return mABfield(quadTag, 1);}; // 0 = edge of normal mesh; 1 = right ab boundary; 2 = lower ab boundary; 3 = ab corner
     double getABVmax() const {return mABC_Vmax;};
@@ -137,10 +140,11 @@ private:
     RDColX mAveGLLSpacing;
     IMatX4 mVicinalAxis;
     double mDistTolerance;
+    RDCol2 mInnerBoundaries;
 
     // for ABCs
-    bool mHasABC;
-    double mHmax, mHmin, mTSource;
+    bool mHasSpongeABC, mHasStaceyABC, mHasExtension;
+    double mHmax, mHmin, mABCwidth, mTSource;
     double mABC_Vmax = -1;
     int mN_ABC, mNumQuadsInner, mNumNodesInner;
     IMatX2 mABfield;

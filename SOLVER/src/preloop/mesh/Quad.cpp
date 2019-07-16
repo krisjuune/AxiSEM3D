@@ -185,8 +185,9 @@ mQuadTag(quadTag) {
     }
 
     // absorbing boundaries
-    mIsABQuad = exModel.isABQuad(quadTag);
-    if (mIsABQuad) {
+    mIsExtQuad = exModel.isExtQuad(quadTag);
+    mIsSpongeQuad = (exModel.hasSpongeABC() && mIsExtQuad);
+    if (mIsExtQuad) {
         for (int i = 0; i < 4; i++) {
             int nodeTag = connect(exModel.getCopyTagAB(mQuadTag), i);
             mCopyCoords(0, i) = exModel.getNodalS(nodeTag);
@@ -195,6 +196,10 @@ mQuadTag(quadTag) {
     } else {
         mCopyCoords = mNodalCoords;
     }
+    
+    mABCRightSide = exModel.getSideRightB(mQuadTag);
+    mABCLowerSide = exModel.getSideLowerB(mQuadTag);
+    mOnAbsBoundary = exModel.hasStaceyABC() && ((mABCRightSide >= 0) || (mABCLowerSide >= 0));
 }
 
 Quad::~Quad() {
@@ -270,11 +275,17 @@ void Quad::setupGLLPoints(std::vector<GLLPoint *> &gllPoints, const IMatPP &myPo
     // compute mass on points
     const arPP_RDColX &mass = mMaterial->computeElementalMass();
 
-    // local reference velocity for absorbing boundaries
-    RDRowN Vref3D = RDRowN::Zero(1, nPE);
-    if (mIsABQuad) {
-        Vref3D = mMaterial->get3DVelocity();
+    // local properties for absorbing boundaries
+    RDMatXN Vp3D = RDMatXN::Zero(mNr, nPE);
+    RDMatXN Vs3D = RDMatXN::Zero(mNr, nPE);
+    RDMatXN Rho3D = RDMatXN::Zero(mNr, nPE);
+
+    if (mOnAbsBoundary || mIsSpongeQuad) {
+        Vp3D = mMaterial->getProperty("vp", -1);
+        Vs3D = mMaterial->getProperty("vs", -1);
+        Rho3D = mMaterial->getProperty("rho", -1);
     }
+    
     for (int ipol = 0; ipol <= nPol; ipol++) {
         for (int jpol = 0; jpol <= nPol; jpol++) {
             int ipnt = ipol * nPntEdge + jpol;
@@ -324,24 +335,56 @@ void Quad::setupGLLPoints(std::vector<GLLPoint *> &gllPoints, const IMatPP &myPo
                 gllPoints[pointTag]->setOceanDepth(mOceanDepth[ipnt]);    
             }
 
-            if (mIsABQuad) {
-                double z_dist = (ABCPar->boundaries[0] - crds[0]) * (ABCPar->boundaries[0] - crds[0]);
-                double s_dist = (ABCPar->boundaries[1] - crds[1]) * (ABCPar->boundaries[1] - crds[1]);
-                double dist = std::sqrt(std::min({s_dist,z_dist}));
+            if (mIsSpongeQuad || mOnAbsBoundary) {
+                RDColX gamma = RDColX::Zero(mPointNr(ipol, jpol), 1);
+                RDMatX3 ABCnormal = RDMatX3::Zero(mPointNr(ipol, jpol),3);
+                
+                // Stacey Condition
+                bool rbry = mOnAbsBoundary && (
+                    (mABCRightSide == 0 && jpol == 0) || 
+                    (mABCRightSide == 1 && ipol == nPol) || 
+                    (mABCRightSide == 2 && jpol == nPol) ||
+                    (mABCRightSide == 3 && ipol == 0));
+                                 
+                bool lbry = mOnAbsBoundary && (
+                    (mABCLowerSide == 0 && jpol == 0) || 
+                    (mABCLowerSide == 1 && ipol == nPol) || 
+                    (mABCLowerSide == 2 && jpol == nPol) ||
+                    (mABCLowerSide == 3 && ipol == 0));
+                    
+                if (rbry & !lbry) {
+                    computeNormalGeneral(ABCnormal, mABCRightSide, ipol, jpol, isCartesian);
+                } else if (lbry & !rbry) {
+                    computeNormalGeneral(ABCnormal, mABCLowerSide, ipol, jpol, isCartesian);
+                }
+                
+                // Kosloff&Kosloff Sponge Boundary
+                if (mIsSpongeQuad) {
+                    double s_dist = std::abs(ABCPar->boundaries[0] - crds[0]);
+                    double z_dist = std::abs(ABCPar->boundaries[1] - crds[1]);
+                    double dist = std::min({s_dist,z_dist});
 
-                //double U0 = ABCPar->Ufac * Vref3D(ipnt) / (2 * ABCPar->Hmax);
-                double U0 = 100 * ABCPar->Ufac;
-                double gamma = U0 * (1 - sin(pi * dist / (2 * ABCPar->width)) * sin(pi * dist / (2 * ABCPar->width)));
-                gllPoints[pointTag]->addGamma(gamma);
-                //TestOut << crds(0) << "," << crds(1) << "," << gamma << "/n";
-                Vref_range[0]=std::min({Vref_range[0], Vref3D(ipnt)});
-                Vref_range[1]=std::max({Vref_range[1], Vref3D(ipnt)});
-                U0_range[0]=std::min({U0_range[0], U0});
-                U0_range[1]=std::max({U0_range[1], U0});
+                    if (rbry & s_dist > tinyDouble) {
+                        throw std::runtime_error("Quad::setupGLLPoints || Right ABC - mesh inconsistency.");
+                    }
+                    if (lbry & z_dist > tinySingle) {
+                        throw std::runtime_error("Quad::setupGLLPoints || Lower ABC - mesh inconsistency.");
+                    }
+                    
+                    RDColX U0 = RDColX::Constant(mNr, 1, 100 * ABCPar->Ufac);
+                    gamma = U0 * (1 - sin(pi * dist / (2 * ABCPar->width)) * sin(pi * dist / (2 * ABCPar->width)));
+
+                    Vref_range[0]=std::min({Vref_range[0], Vp3D.col(ipnt).minCoeff()});
+                    Vref_range[1]=std::max({Vref_range[1], Vp3D.col(ipnt).maxCoeff()});
+                    U0_range[0]=std::min({U0_range[0], U0.minCoeff()});
+                    U0_range[1]=std::max({U0_range[1], U0.maxCoeff()});
+                }
+            
+                gllPoints[pointTag]->setABC(gamma, Rho3D.col(ipnt), Vp3D.col(ipnt), Vs3D.col(ipnt));
+                gllPoints[pointTag]->addABCNormal(ABCnormal);
             }
         }
     }
-    //TestOut.close()
 }
 
 int Quad::release(Domain &domain, const IMatPP &myPointTags, const AttBuilder *attBuild, bool recordingWF) const {
@@ -643,6 +686,92 @@ RDColX Quad::getHminSlices() const {
         }
     }
     return hmin;
+}
+
+void Quad::computeNormalGeneral(RDMatX3 &normal, int side, int ipol, int jpol, bool isCartesian) const {
+    const RDCol2 &xieta = SpectralConstants::getXiEta(ipol, jpol, mIsAxial);
+    const RDCol2 &crds = mapping(xieta);
+
+    double dl, s;
+    RDMat33 Q = RDMat33::Zero(3, 3);
+    IColX normal_inplane = IColX::Zero(3, 1);
+    if (isCartesian) {
+        double dx = std::abs(mNodalCoords(0, side) - mNodalCoords(0, Mapping::period0123(side + 1)));
+        double dz = std::abs(mNodalCoords(1, side) - mNodalCoords(1, Mapping::period0123(side + 1)));
+        if (dx > dz) {
+            if (mNodalCoords(1, side) < mNodalCoords(1, Mapping::period0123(side + 2))) {
+                normal_inplane(2) = -1;
+            } else {
+                normal_inplane(2) = 1;
+            }
+            dl = dx;
+        } else {
+            if (mNodalCoords(0, side) < mNodalCoords(0, Mapping::period0123(side + 2))) {
+                normal_inplane(0) = -1;
+            } else {
+                normal_inplane(0) = 1;
+            }
+            dl = dz;
+        }
+
+        Q(0,0) = 1.;
+        Q(1,1) = 1.;
+        Q(2,2) = 1.;
+
+        s = crds(0);
+    } else {
+        double r0, r1, r2, theta0, theta1, theta2;
+        Geodesy::rtheta(mNodalCoords.col(side), r0, theta0);
+        Geodesy::rtheta(mNodalCoords.col(Mapping::period0123(side + 1)), r1, theta1);
+        Geodesy::rtheta(mNodalCoords.col(Mapping::period0123(side + 2)), r2, theta2);
+        double rsf = .5 * (r0 + r1);
+        if (rsf * std::abs(theta1 - theta0) > std::abs(r0 - r1)) {
+            normal_inplane(2) = (r2 > r0) ? -1 : 1;
+            dl = rsf * std::abs(theta1 - theta0);
+        } else {
+            normal_inplane(0) = (theta2 > theta0) ? -1 : 1;
+            dl = std::abs(r0 - r1);
+        }
+        double sint = crds(0) / crds.norm();
+        double cost = crds(1) / crds.norm();
+        Q(0, 0) = cost;
+        Q(0, 2) = sint;
+        Q(1, 1) = 1.;
+        Q(2, 0) = -sint;
+        Q(2, 2) = cost;
+
+        s = rsf * sint;
+    }
+    
+    RDMatX3 nRTZ(mPointNr(ipol, jpol), 3);
+    if (hasRelabelling() & normal_inplane(2) != 0) {
+        nRTZ = mRelabelling->getSFNormalRTZ(ipol, jpol);
+        if (normal_inplane(2) == -1) nRTZ *= -1;
+    } else {
+        nRTZ.col(0).fill(normal_inplane(0));
+        nRTZ.col(1).fill(normal_inplane(1));
+        nRTZ.col(2).fill(normal_inplane(2));
+    }
+    
+    if (hasRelabelling() & normal_inplane(0) != 0) {
+        nRTZ.col(0) *= mRelabelling->getStaceyNormalWeight(ipol, jpol, side);
+    }
+    
+    normal = nRTZ * Q.transpose();
+    
+    const RDCol2 &w = 0.5 * SpectralConstants::getWeights(ipol, jpol, mIsAxial);
+    double wsf = (side == 0 || side == 2) ? w(0) : w(1);
+    if (mIsAxial) {
+        if (ipol == 0) {
+            const RDMat22 &J = jacobian(xieta);
+            wsf *= J(0, 0) * dl;
+        } else {
+            wsf *= s * dl / (1. + xieta(0));
+        }
+    } else {
+        wsf *= s * dl;
+    }
+    normal *= wsf;
 }
 
 RDMatX3 Quad::computeNormal(int side, int ipol, int jpol, bool isCartesian) const {

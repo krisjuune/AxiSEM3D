@@ -48,7 +48,6 @@ public:
     
     // get properties
     RDMatXN getProperty(const std::string &vname, int refType);
-    RDRowN get3DVelocity();
 
     //////////// anisotropy /////////////
 private:    

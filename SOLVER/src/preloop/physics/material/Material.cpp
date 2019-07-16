@@ -92,6 +92,7 @@ Material::Material(const Quad *myQuad, const ExodusModel &exModel): mMyQuad(myQu
         }
     }
 }
+
 void Material::addVolumetric3D(const std::vector<Volumetric3D *> &m3D,
     double srcLat, double srcLon, double srcDep, double phi2D, const int ABPosition) {
     if (m3D.size() == 0) {
@@ -643,7 +644,7 @@ RDMatXN Material::getProperty(const std::string &vname, int refType) {
     }
     
     // 3D
-    if (refType == SlicePlot::PropertyRefTypes::Property3D) {
+    if (refType == SlicePlot::PropertyRefTypes::Property3D || refType < 0) {
         return data3D;
     }
     
@@ -665,12 +666,6 @@ RDMatXN Material::getProperty(const std::string &vname, int refType) {
     // perturb
     RDMatXN data1DBase = data1DXN.array().max(tinyDouble).matrix(); // in fluid, vs = 0
     return ((data3D - data1DXN).array() / data1DBase.array()).matrix();
-}
-
-RDRowN Material::get3DVelocity() {
-    RDMatXN V3Dv = getProperty("vsv", SlicePlot::PropertyRefTypes::Property3D);
-    RDMatXN V3Dh = getProperty("vsh", SlicePlot::PropertyRefTypes::Property3D);
-    return 0.5*(V3Dh.row(0) + V3Dv.row(0));
 }
 
 void Material::initAniso() {

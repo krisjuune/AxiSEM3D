@@ -17,7 +17,7 @@ public:
 
     ABCParameters(const Parameters &par, const ExodusModel *exModel) {
     n = exModel->getNumAbsElements();
-    Ufac = par.getValue<double>("ABC_FACTOR");
+    Ufac = par.getValue<double>("SPONGE_ABSORBING_FACTOR");
     Hmax = exModel->getHmax();
     boundaries = exModel->getBoundaries();
 

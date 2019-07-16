@@ -41,7 +41,7 @@ int axisem_main(int argc, char *argv[]) {
         
         //////// fourier field 
         MultilevelTimer::begin("Build NrField", 0);
-        NrField::buildInparam(pl.mNrField, *(pl.mParameters), verbose);
+        NrField::buildInparam(pl.mNrField, *(pl.mParameters), pl.mExodusModel, verbose);
         MultilevelTimer::end("Build NrField", 0);
         
         //////// source

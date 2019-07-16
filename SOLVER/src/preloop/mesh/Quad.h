@@ -109,6 +109,8 @@ public:
         
     // for time-slice recording
     void getWFRweights(RDMatPP &WF_interpfact) const;
+    
+    bool mIsAxial, mOnSFBoundary, mOnSurface, mOnAbsBoundary, mIsExtQuad, mIsSpongeQuad;
 
 protected:
         
@@ -126,6 +128,7 @@ protected:
     
     // compute normal
     RDMatX3 computeNormal(int side, int ipol, int jpol, bool isCartesian) const;
+    void computeNormalGeneral(RDMatX3 &normal, int side, int ipol, int jpol, bool isCartesian) const;
 
     ////////////////////////////////////////////////// Nodal level
     // quad tag in Exodus
@@ -147,8 +150,8 @@ protected:
     bool mIsFluid;
     
     // axial, sf, surface boundaries, absorbing boundaries
-    bool mIsAxial, mOnSFBoundary, mOnSurface, mIsABQuad;
-    int mAxialSide, mSFSide, mSurfaceSide;
+    
+    int mAxialSide, mSFSide, mSurfaceSide, mABCRightSide, mABCLowerSide;
     double mVref;
 
     ////////////////////////////////////////////////// GLL level

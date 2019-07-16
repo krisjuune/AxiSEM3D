@@ -223,15 +223,8 @@ void ExodusModel::formAuxiliary() {
     for (int axialQuad = 0; axialQuad < getNumQuads(); axialQuad++) {
 
         int shift=0;
-
         int axialSide = getSideAxis(axialQuad);
-        int rightSide = getSideRightB(axialQuad);
-        int bottomSide = getSideLowerB(axialQuad);
-
-        if (hasABC() & rightSide != 1 & rightSide != -1) {shift = rightSide - 1;}
-        if (hasABC() & bottomSide != 0 & bottomSide != -1) {shift = bottomSide;}
         if (axialSide != 3 & axialSide != -1) {shift = axialSide - 3;}
-
         if (shift==0) {
             continue;
         }
@@ -273,8 +266,10 @@ void ExodusModel::formAuxiliary() {
     mABfield = IMatX2::Constant(getNumQuads(), 2,-1);
     mNumQuadsInner = getNumQuads();
     mNumNodesInner = getNumNodes();
+    mInnerBoundaries = getBoundaries();
 
-    if (hasABC()) {
+    if (mHasExtension) {
+        mN_ABC = ceil(round(10000 * mABCwidth / mHmax) / 10);
         AddAbsorbingBoundaryElements();
     }
     MultilevelTimer::end("Process Absorbing Boundaries", 2);
@@ -403,7 +398,7 @@ void ExodusModel::AddAbsorbingBoundaryElements() {
 
     std::vector<int> rightBQuadTags;
     for (int tag = 0; tag < nQuads; tag++) {
-        if (getSideRightB(tag) == 1) {
+        if (getSideRightB(tag) >= 0) {
             rightBQuadTags.push_back(tag);
         }
     }
@@ -420,15 +415,16 @@ void ExodusModel::AddAbsorbingBoundaryElements() {
         it->second.conservativeResize(nQuads + ExtNr, 1);
     }
 
-    int BottomRightNode = mConnectivity(rightBQuadTags[0], 1);
+    int BottomRightNode = mConnectivity(rightBQuadTags[0], getSideRightB(rightBQuadTags[0]));
     mNodalS.segment(nNodes, mN_ABC) = RDColX::LinSpaced(mN_ABC, mNodalS(BottomRightNode) + mHmax, mNodalS(BottomRightNode) + mN_ABC * mHmax);
     mNodalZ.segment(nNodes, mN_ABC) = RDColX::Constant(mN_ABC, 1, mNodalZ(BottomRightNode));
 
     for (int i = 0; i < rightBQuadTags.size(); i++) {
         int myQuad = rightBQuadTags[i];
-        int node3_ini = mConnectivity(myQuad, 2);
+        int side = getSideRightB(myQuad);
+        int node3_ini = mConnectivity(myQuad, side + 1);
         int node1_ini = nNodes + i * mN_ABC;
-        mConnectivity.row(nQuads + mN_ABC * i) << mConnectivity(myQuad, 1), node1_ini, node1_ini + mN_ABC, node3_ini;
+        mConnectivity.row(nQuads + mN_ABC * i) << mConnectivity(myQuad, side), node1_ini, node1_ini + mN_ABC, node3_ini;
         for (int j = 0; j < mN_ABC - 1; j++) {
             int node0 = node1_ini + j;
             mConnectivity.row(nQuads + i * mN_ABC + j + 1) << node0, node0 + 1, node0 + mN_ABC + 1, node0 + mN_ABC;
@@ -454,7 +450,7 @@ void ExodusModel::AddAbsorbingBoundaryElements() {
 
     std::vector<int> lowerBQuadTags;
     for (int tag = 0; tag < nQuads; tag++) {
-        if (getSideLowerB(tag) == 0) {
+        if (getSideLowerB(tag) >= 0) {
             lowerBQuadTags.push_back(tag);
         }
     }
@@ -478,9 +474,10 @@ void ExodusModel::AddAbsorbingBoundaryElements() {
     int CornerQuadTag;
     for (int i = 0; i < lowerBQuadTags.size(); i++) {
         int myQuad = lowerBQuadTags[i];
-        int node2_ini = mConnectivity(myQuad, 1);
+        int side = getSideLowerB(myQuad);
+        int node2_ini = mConnectivity(myQuad, side + 1);
         int node0_ini = nNodes + i * mN_ABC;
-        mConnectivity.row(nQuads + mN_ABC * i) << node0_ini, node0_ini + mN_ABC, node2_ini, mConnectivity(myQuad, 0);
+        mConnectivity.row(nQuads + mN_ABC * i) << node0_ini, node0_ini + mN_ABC, node2_ini, mConnectivity(myQuad, side);
         for (int j = 0; j < mN_ABC - 1; j++) {
             int node0 = node0_ini + j + 1;
             mConnectivity.row(nQuads + i * mN_ABC + j + 1) << node0, node0 + mN_ABC, node0 + mN_ABC - 1, node0 - 1;
@@ -552,9 +549,9 @@ std::string ExodusModel::verbose() const {
     ss << "    " << std::setw(width) << "..." << std::endl;
     ss << "    " << std::setw(width) << mNumNodesInner - 1 << ": ";
     ss << std::setw(13) << mNodalS(mNumNodesInner - 1) << std::setw(13) << mNodalZ(mNumNodesInner - 1) << std::endl;
-    if (hasABC()) {
+    if (hasExtension()) {
         ss << "    " << std::setw(width) << "..." << std::endl;
-        ss << "    " << std::setw(width) << "absorbing boundary ends at" << std::endl;
+        ss << "    " << std::setw(width) << "extended boundary ends at" << std::endl;
         ss << "    " << std::setw(width) << getNumNodes() << ": ";
         ss << std::setw(13) << mNodalS(getNumNodes() - 1) << std::setw(13) << mNodalZ(getNumNodes() - 1) << std::endl;
     }
@@ -580,7 +577,7 @@ std::string ExodusModel::verbose() const {
             pair += (int)(it->second(q) >= 0);
         }
         ss << pair;
-        if (hasABC()) {
+        if (hasExtension()) {
             pair = 0;
             for (int q = mNumQuadsInner; q < getNumQuads(); q++) {
                 pair += (int)(it->second(q) >= 0);
@@ -609,8 +606,16 @@ void ExodusModel::buildInparam(ExodusModel *&exModel, const Parameters &par,
     exfile = Parameters::sInputDirectory + "/" + exfile;
     exModel = new ExodusModel(exfile);
 
-    exModel->mHasABC = par.getValue<bool>("ABSORBING_BOUNDARIES");
-    exModel->mN_ABC = par.getValue<int>("ABC_ELEMENTS");
+    if (par.getValue<bool>("LOW-ORDER_EXTENSION")) {
+        exModel->mHasExtension = true;
+        exModel->mABCwidth = par.getValue<double>("EXTENSION_WIDTH");
+        exModel->mHasSpongeABC = false;
+    } else {
+        exModel->mHasSpongeABC = par.getValue<bool>("SPONGE_BOUNDARIES");
+        exModel->mHasExtension = par.getValue<bool>("SPONGE_BOUNDARIES");
+        exModel->mABCwidth = par.getValue<double>("SPONGE_WIDTH");
+    }
+    exModel->mHasStaceyABC = par.getValue<bool>("STACEY_BOUNDARIES");
     exModel->mTSource = 2 * par.getValue<double>("SOURCE_STF_HALF_DURATION");
 
     exModel->initialize();

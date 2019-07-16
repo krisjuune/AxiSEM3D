@@ -19,7 +19,7 @@ mFactD0(factD0), mStartD(startD), mEndD(endD) {
     // nothing
 }
 
-int EmpNrField::getNrAtPoint(const RDCol2 &coords) const {
+int EmpNrField::getNrAtPointInternal(const RDCol2 &coords) const {
     double s = coords(0);
     double z = coords(1);
     double r, theta;

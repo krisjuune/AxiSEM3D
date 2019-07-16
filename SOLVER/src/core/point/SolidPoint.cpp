@@ -5,9 +5,11 @@
 #include "SolidPoint.h"
 #include "Mass.h"
 #include "MultilevelTimer.h"
+#include "ABC.h"
 
-SolidPoint::SolidPoint(int nr, bool axial, const RDCol2 &crds, Mass *mass, const double gamma):
-Point(nr, axial, crds), mMass(mass), mGamma(gamma) {
+SolidPoint::SolidPoint(int nr, bool axial, const RDCol2 &crds, Mass *mass, 
+    ABC *ABC): Point(nr, axial, crds), mMass(mass), mABC(ABC) {
+        
     mDispl = CMatX3::Zero(mNu + 1, 3);
     mVeloc = CMatX3::Zero(mNu + 1, 3);
     mAccel = CMatX3::Zero(mNu + 1, 3);
@@ -22,7 +24,9 @@ SolidPoint::~SolidPoint() {
 
 void SolidPoint::updateNewmark(Real dt) {
     // calculate new acceleration
-      // mask stiff
+    if (mABC) mStiff -= mABC->StaceyTraction(mVeloc);
+
+    // mask stiff
     maskField(mStiff);
       // compute accel inplace
     mMass->computeAccel(mStiff);
@@ -31,15 +35,16 @@ void SolidPoint::updateNewmark(Real dt) {
     // update dt
     Real half_dt = half * dt;
     Real half_dt_dt = half_dt * dt;
+    
+    // damp acceleration in sponge boundary
+    if (mABC) mABC->applyKosloffDamping(mStiff, mVeloc, mDispl);
+    
     // update velocity and old acceleration
     mVeloc += half_dt * (mAccel + mStiff);
     mAccel = mStiff;
     // update displacement
     mDispl += dt * mVeloc + half_dt_dt * mAccel;
-
-    // absorbing boundaries
-    mAccel -= 2 * mGamma * mVeloc + mGamma * mGamma * mDispl;
-
+    
     // zero stiffness for next time step
     mStiff.setZero();
 }

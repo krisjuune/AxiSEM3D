@@ -30,6 +30,9 @@ public:
     // solid-fluid
     RDMatX3 getSFNormalRTZ(int ipol, int jpol) const;
     
+    // stacey ABCs
+    RDColX getStaceyNormalWeight(int ipol, int jpol, int side) const;
+    
     // is undulation zero
     bool isZero() const;
     

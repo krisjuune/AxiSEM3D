@@ -5,13 +5,14 @@
 #pragma once
 
 class Mass;
+class ABC;
 #include "Point.h"
 
 class FluidPoint: public Point {
     friend class SolidFluidPoint;
 
 public:
-    FluidPoint(int nr, bool axial, const RDCol2 &crds, Mass *mass, bool fluidSurf, const double gamma);
+    FluidPoint(int nr, bool axial, const RDCol2 &crds, Mass *mass, const bool fluidSurf, ABC *ABC);
     ~FluidPoint();
 
     // update in time domain by Newmark
@@ -74,8 +75,8 @@ private:
     // mass
     Mass *mMass;
     
-    // ABC factor
-    double mGamma;
+    // absorbing boundaries
+    ABC *mABC = 0;
 
     // wisdom
     Real mMaxDisplWisdom = -1.;

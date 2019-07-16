@@ -76,9 +76,9 @@ void Volumetric3D_SEG::initialize(const std::vector<std::string> &params) {
         //         "Error opening SEG_C3NA.crd0 data files at directory: ||" + path);
         // }
         std::cout << "Volumetric3D_SEG::initialize || reading xyz.." << std::endl;
-        std::vector<double> X = readDoubleArray(path + "/SEG_C3NA.crdx");
-        std::vector<double> Y = readDoubleArray(path + "/SEG_C3NA.crdy");
-        std::vector<double> Z = readDoubleArray(path + "/SEG_C3NA.crdz");
+        std::vector<double> X = readDoubleArray(path + "/SEG_C3NA_small.crdx");
+        std::vector<double> Y = readDoubleArray(path + "/SEG_C3NA_small.crdy");
+        std::vector<double> Z = readDoubleArray(path + "/SEG_C3NA_small.crdz");
 
         mNx = X.size();
         mNy = Y.size();
@@ -126,17 +126,17 @@ void Volumetric3D_SEG::initialize(const std::vector<std::string> &params) {
 
     if (XMPI::rank() == vp_mpirank) {
         std::cout << "Volumetric3D_SEG::initialize || reading vp.." << std::endl;
-        readDoubleMat(path + "/SEG_C3NA.vp", mNz, mVp);
+        readDoubleMat(path + "/SEG_C3NA_small.vp", mNz, mVp);
     }
 
     if (XMPI::rank() == vs_mpirank) {
         std::cout << "Volumetric3D_SEG::initialize || reading vs.." << std::endl;
-        readDoubleMat(path + "/SEG_C3NA.vs", mNz, mVs);
+        readDoubleMat(path + "/SEG_C3NA_small.vs", mNz, mVs);
     }
 
     if (XMPI::rank() == rho_mpirank) {
         std::cout << "Volumetric3D_SEG::initialize || reading rho.." << std::endl;
-        readDoubleMat(path + "/SEG_C3NA.rho", mNz, mRho);
+        readDoubleMat(path + "/SEG_C3NA_small.rho", mNz, mRho);
     }
 
     XMPI::cout << "Volumetric3D_SEG::initialize || broadcasting vp.." << XMPI::endl;

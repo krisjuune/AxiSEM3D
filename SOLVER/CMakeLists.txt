@@ -127,6 +127,7 @@ include_directories(
     src/core/point
     src/core/point/mass
     src/core/point/solid_fluid
+    src/core/point/absorbing_boundaries
 
     src/core/element
     src/core/element/crd
@@ -215,6 +216,7 @@ add_executable(
     src/core/point/SolidFluidPoint.cpp
     src/core/point/solid_fluid/SFCoupling1D.cpp
     src/core/point/solid_fluid/SFCoupling3D.cpp
+    src/core/point/absorbing_boundaries/ABC.cpp
 
     src/core/element/material/acoustic/Acoustic1D.cpp
     src/core/element/material/acoustic/Acoustic3D.cpp

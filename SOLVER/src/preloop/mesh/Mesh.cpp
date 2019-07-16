@@ -320,13 +320,8 @@ void Mesh::buildLocal(const DecomposeOption &option) {
             int nr = mGLLPoints[pTag]->getNr();
             nr_max = std::max(nr, nr_max);
         }
-        // nr_max for solid mass
-        // nr_max for fluid mass
-        // nr_max * 3 for surface normal
-        // nr_max * 3 for solid-fluid normal
-        // 1 for reference count
-        bufferGLLSend.push_back(RDMatXX::Zero(nr_max * 8 + 1, npoint));
-        bufferGLLRecv.push_back(RDMatXX::Zero(nr_max * 8 + 1, npoint));
+        bufferGLLSend.push_back(RDMatXX::Zero(nr_max * 11 + 1, npoint));
+        bufferGLLRecv.push_back(RDMatXX::Zero(nr_max * 11 + 1, npoint));
     }
 
     // feed buffer
@@ -568,16 +563,28 @@ void Mesh::test() {
 std::string Mesh::ABC_verbose() const {
     std::stringstream ss;
     ss << "\n=================== Absorbing Boundaries ===================" << std::endl;
-    if (mExModel->hasABC()) {
-        ss << "  Mesh Extended by     =   " << mABCPar->n << std::endl;
-        ss << "  Boundary Width (km)  =   " << mABCPar->width / 1000 << std::endl;
-        ss << "  Total Absorb. Elem.  =   " << mExModel->getNumQuads() - mExModel->getNumQuadsInner() << std::endl;
-        ss << "  Total Normal Elem.   =   " << mExModel->getNumQuadsInner() << std::endl;
-        ss << "  Att. Multiplier      =   " << mABCPar->Ufac << std::endl;
-        ss << "  Reference Velocities =   " << mVref_range[0] << " ... " << mVref_range[1] << std::endl;
-        ss << "  Max. Attenuations    =   " << mU0_range[0] << " ... " << mU0_range[1] << std::endl;
+    if (mExModel->hasExtension()) {
+        ss << "  Mesh Extension at Boundary___________________________" << std::endl;
+        ss << "    Mesh Extended by     =   " << mABCPar->n << std::endl;
+        ss << "    Boundary Width (km)  =   " << mABCPar->width / 1000 << std::endl;
+        ss << "    Total Boundary Elem. =   " << mExModel->getNumQuads() - mExModel->getNumQuadsInner() << std::endl;
+        ss << "    Total Normal Elem.   =   " << mExModel->getNumQuadsInner() << std::endl;
+        if (mExModel->hasSpongeABC()) {
+            ss << "    Extension Type       =   Kosloff&Kosloff Sponge Boundary" << std::endl;
+            ss << "      Att. Multiplier      =   " << mABCPar->Ufac << std::endl;
+            ss << "      Reference Velocities =   " << mVref_range[0] << " ... " << mVref_range[1] << std::endl;
+            ss << "      Max. Attenuations    =   " << mU0_range[0] << " ... " << mU0_range[1] << std::endl;
+        } else {
+            ss << "    Extension Type       =   Low Order Extension" << std::endl;
+            ss << "      Extension Order      =   " << mABCPar->Ufac << std::endl;
+        }
     } else {
-        ss << "  Absorbing boundaries are turned off." << std::endl;
+        ss << "  No Mesh Extension." << std::endl;
+    }
+    if (mExModel->hasStaceyABC()) {
+        ss << "  Stacey Absorbing Boundary Condition is turned on." << std::endl;
+    } else {
+        ss << "  Stacey Absorbing Boundary Condition is turned off." << std::endl;
     }
     ss << "=================== Absorbing Boundaries ===================\n" << std::endl;
     return ss.str();
