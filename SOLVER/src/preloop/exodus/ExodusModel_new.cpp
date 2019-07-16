@@ -25,7 +25,6 @@
 
 #include <algorithm>
 #include <boost/lexical_cast.hpp>
-#include "XMath.h"
 
 ExodusModel::ExodusModel(const std::string &fileName): mExodusFileName(fileName) {
     std::vector<std::string> substrs = Parameters::splitString(mExodusFileName, "/");
@@ -229,7 +228,6 @@ void ExodusModel::readRawData() {
     
     // element-wise
     mElementalVariableNames_elem.push_back("element_type");
-    mElementalVariableNames_elem.push_back("dt");
     mElementalVariableValues_elem = RDMatXX::Zero(getNumQuads(), 
         mElementalVariableNames_elem.size());
     for (int i = 0; i < mElementalVariableNames_elem.size(); i++) {
@@ -247,18 +245,6 @@ void ExodusModel::readRawData() {
 }
 
 void ExodusModel::bcastRawData() {
-    // 
-    // XMPI::cout << XMath::eigenMemoryInfo("mGlobalVariableValues", mGlobalVariableValues) << XMPI::endl;
-    // XMPI::cout << XMath::eigenMemoryInfo("mConnectivity", mConnectivity) << XMPI::endl;
-    // XMPI::cout << XMath::eigenMemoryInfo("mNodalS", mNodalS) << XMPI::endl;
-    // XMPI::cout << XMath::eigenMemoryInfo("mNodalZ", mNodalZ) << XMPI::endl;
-    // XMPI::cout << XMath::eigenMemoryInfo("mElementalVariableValues_elem", mElementalVariableValues_elem) << XMPI::endl;
-    // XMPI::cout << XMath::eigenMemoryInfo("mElementalVariableValues_axis", mElementalVariableValues_axis) << XMPI::endl;
-    // XMPI::cout << XMath::eigenMemoryInfo("mElementalVariableCoords_axis", mElementalVariableCoords_axis) << XMPI::endl;
-    // XMPI::cout << XMath::eigenMemoryInfo("mSideSetValues", mSideSetValues) << XMPI::endl;
-    // XMPI::cout << XMath::eigenMemoryInfo("mEllipKnots", mEllipKnots) << XMPI::endl;
-    // XMPI::cout << XMath::eigenMemoryInfo("mEllipCoeffs", mEllipCoeffs) << XMPI::endl;
-    // 
     XMPI::bcast(mGlobalVariableNames);
     XMPI::bcastEigen(mGlobalVariableValues);
     XMPI::bcast(mGlobalRecordsRaw);
@@ -328,9 +314,7 @@ void ExodusModel::formStructured() {
     
     mSSNameAxis = isCartesian() ? "x0" : sphere_axis_name;
     mSSNameSurface = isCartesian() ? "y1" : "r1";
-    mSSNameRightB = isCartesian() ? "x1" : "t1";
-    mSSNameLowerB = isCartesian() ? "y0" : "r0";
-
+    
     // NOTE: we temporarily treat Cartesian meshes as special cases of spherical meshes
     //       by means of moving it to the "north pole". The introduced global 
     //       curvature should be ignorable, or the problem itself is ill-defined
@@ -376,15 +360,20 @@ void ExodusModel::formAuxiliary() {
     } 
     XMPI::sumEigenDouble(mAveGLLSpacing);
     MultilevelTimer::end("Process Exodus GLL-Spacing", 2);
-
-    // locate Solid-fluid Boundaries
-    MultilevelTimer::begin("Process Exodus Solid-Fluid Boundary", 2);
-    // find nodes which are part of both solid and fluid quads
-    std::vector<bool> SFNode;
-    for (int i = 0; i < getNumNodes(); i++) {
-        int SumFluid = 0;
-        for (int j = 0; j < refElem[i].size(); j++) {
-            SumFluid += getElementalVariables("fluid",refElem[i][j]);
+    
+    // rotate nodes of axial elements such that side 3 is on axis
+    MultilevelTimer::begin("Process Exodus Axis", 2);
+    for (int axialQuad = 0; axialQuad < getNumQuads(); axialQuad++) {
+        // loop over t0
+        int axialSide = getSideAxis(axialQuad);
+        if (axialSide == 3 || axialSide == -1) {
+            continue;
+        }
+    
+        // connectivity
+        IRow4 con = mConnectivity.row(axialQuad);
+        for (int j = 0; j < 4; j++) {
+            mConnectivity(axialQuad, j) = con(Mapping::period0123(j + axialSide - 3));
         }
         
         // side sets
@@ -397,9 +386,8 @@ void ExodusModel::formAuxiliary() {
         // done
         // mSideSets.at(mSSNameAxis)(axialQuad) = 3;
     }
-    mSideSets.insert(std::pair<std::string, IColX>("solid_fluid_boundary", SideSets_SF));
-    MultilevelTimer::end("Process Exodus Solid-Fluid Boundary", 2);
-
+    MultilevelTimer::end("Process Exodus Axis", 2);
+    
     // find elements that are not axial but neighboring axial elements
     MultilevelTimer::begin("Process Exodus Vicinal", 2);
     mVicinalAxis = IMatX4::Constant(getNumQuads(), 4, -1);
@@ -427,223 +415,6 @@ void ExodusModel::formAuxiliary() {
     }
     MultilevelTimer::end("Process Exodus Vicinal", 2);
 }
-
-void ExodusModel::AddAbsorbingBoundaryElements() {
-
-    int node0, node1, node2, node3;
-    int Side, nNewNodes_right = 0, nNewNodes_bottom = 0;
-    int iABCcopy = 0;
-    bool set1, set2;
-    RDCol2 node0coords, node1coords, node2coords, node3coords;
-    std::vector<RDCol2> NewNodeCoords_right, NewNodeCoords_bottom;
-    IRow4 newABCelem;
-    std::vector<double> mapABCtoGlobal;
-
-    int nQuads = getNumQuads();
-    int nQuads_ini = nQuads;
-    int nNodes = getNumNodes();
-
-    // for verbose output to distinguish between inner mesh and boundaries
-    mNumQuadsInner = nQuads_ini;
-    mNumNodesInner = nNodes;
-
-    // add N_ABC boundary elements to the right of each quad at x1
-    for (int rightB_Quad = 0; rightB_Quad < nQuads_ini; rightB_Quad++) {
-
-        if (getSideRightB(rightB_Quad) == 1) {
-            mSideSets.at(mSSNameRightB)(rightB_Quad) = -1; // after adding new elements selected quad is no longer at the edge of the mesh
-
-            mABfield[rightB_Quad] = {0,++iABCcopy};
-
-            // find nodes at boundary of inner mesh
-            node0 = mConnectivity(rightB_Quad,1);
-            node3 = mConnectivity(rightB_Quad,2);
-
-            // specified number of boundary elements added to the right side of the selected quad
-            for (int n = 1; n <= mN_ABC; n++) {
-                set1 = 0;
-                set2 = 0;
-
-                // coordinates for outer nodes of the new quad
-                node1coords[0] = mNodalS(node0) + mHmax;
-                node1coords[1] = mNodalZ(node0);
-                node2coords[0] = mNodalS(node3) + mHmax;
-                node2coords[1] = mNodalZ(node3);
-
-                // check if outer nodes had been added previously
-                for (int i = 0; i < nNewNodes_right; i++) {
-                    if (NewNodeCoords_right[i] == node1coords) {
-                        node1 = mapABCtoGlobal[i];
-                        set1 = 1;
-                    }
-                    if (NewNodeCoords_right[i] == node2coords) {
-                        node2 = mapABCtoGlobal[i];
-                        set2 = 1;
-                    }
-                }
-
-                // adding new nodes if required
-                if (!set1) {
-                    node1 = nNodes;
-                    NewNodeCoords_right.push_back(node1coords);
-                    mapABCtoGlobal.push_back(nNodes);
-                    mNodalS.conservativeResize(nNodes + 1, 1);
-                    mNodalS[nNodes] = node1coords[0];
-                    mNodalZ.conservativeResize(nNodes + 1, 1);
-                    mNodalZ[nNodes] = node1coords[1];
-                    nNodes++;
-                    nNewNodes_right++;
-                }
-                if (!set2) {
-                    node2 = nNodes;
-                    NewNodeCoords_right.push_back(node2coords);
-                    mapABCtoGlobal.push_back(nNodes);
-                    mNodalS.conservativeResize(nNodes + 1, 1);
-                    mNodalS[nNodes] = node2coords[0];
-                    mNodalZ.conservativeResize(nNodes + 1, 1);
-                    mNodalZ[nNodes] = node2coords[1];
-                    nNodes++;
-                    nNewNodes_right++;
-                }
-
-                // add new quad to connectivity map
-                newABCelem = {node0, node1, node2, node3};
-                mConnectivity.conservativeResize(nQuads + 1, 4);
-                mConnectivity.row(nQuads) = newABCelem;
-
-                // update list of elemental variables and side sets (copies from nearest quad in inner mesh)
-                for (int i = 0; i < mElementalVariableNames.size(); i++) {
-                    std::string vname = mElementalVariableNames[i];
-                    RDColX temp = mElementalVariables.at(vname);
-                    temp.conservativeResize(nQuads + 1,1);
-                    // handling gradients near the boundary -> only constant values from nodes at edge are passed on
-                    if (vname.substr(vname.length() - 2, 2) == std::string("_0")) {
-                        temp(nQuads) = mElementalVariables.at(vname.substr(0, vname.length() - 2) + "_1")(rightB_Quad);
-                    } else if (vname.substr(vname.length() - 2, 2) == std::string("_3")) {
-                        temp(nQuads) = mElementalVariables.at(vname.substr(0, vname.length() - 2) + "_2")(rightB_Quad);
-                    } else {
-                        temp(nQuads) = mElementalVariables.at(vname)(rightB_Quad);
-                    }
-                    mElementalVariables.at(vname) = temp;
-                }
-                for (int i = 0; i < mSideSetNames.size(); i++) {
-                    IColX temp = mSideSets.at(mSideSetNames[i]);
-                    temp.conservativeResize(nQuads + 1,1);
-                    temp(nQuads) = mSideSets.at(mSideSetNames[i])(rightB_Quad);
-                    mSideSets.at(mSideSetNames[i]) = temp;
-                }
-
-                // updating inner nodes for next iteration
-                node0 = node1;
-                node3 = node2;
-
-                mABfield.push_back({1,iABCcopy});
-                nQuads++;
-            }
-
-            mSideSets.at(mSSNameRightB)(nQuads - 1) = 1; // last boundary element is placed at edge of the mesh
-        }
-    }
-
-    // update quad number to include right boundary zone
-    nQuads_ini = nQuads;
-    mapABCtoGlobal.clear();
-
-    // add boundary at y0 (lower bound)
-    // same principle - see comments of section above
-    for (int lowerB_Quad = 0; lowerB_Quad < nQuads_ini; lowerB_Quad++) {
-
-        if (getSideLowerB(lowerB_Quad) == 0) {
-            mSideSets.at(mSSNameLowerB)(lowerB_Quad) = -1;
-
-            if (mABfield[lowerB_Quad](0) == -1) {
-                mABfield[lowerB_Quad] = {0,++iABCcopy};
-            }
-
-            node2 = mConnectivity(lowerB_Quad,1);
-            node3 = mConnectivity(lowerB_Quad,0);
-
-            for (int n = 1; n <= mN_ABC; n++) {
-                set1 = 0;
-                set2 = 0;
-
-                node0coords[0] = mNodalS(node3);
-                node0coords[1] = mNodalZ(node3) - mHmax;
-                node1coords[0] = mNodalS(node2);
-                node1coords[1] = mNodalZ(node2) - mHmax;
-
-                for (int i = 0; i < nNewNodes_bottom; i++){
-                    if (NewNodeCoords_bottom[i] == node0coords) {
-                        node0 = mapABCtoGlobal[i];
-                        set1 = 1;
-                    }
-                    if (NewNodeCoords_bottom[i] == node1coords) {
-                        node1 = mapABCtoGlobal[i];
-                        set2 = 1;
-                    }
-                }
-
-                if (!set1) {
-                    node0 = nNodes;
-                    NewNodeCoords_bottom.push_back(node0coords);
-                    mapABCtoGlobal.push_back(nNodes);
-                    mNodalS.conservativeResize(nNodes + 1, 1);
-                    mNodalS[nNodes] = node0coords[0];
-                    mNodalZ.conservativeResize(nNodes + 1, 1);
-                    mNodalZ[nNodes] = node0coords[1];
-                    nNodes++;
-                    nNewNodes_bottom++;
-                }
-                if (!set2) {
-                    node1 = nNodes;
-                    NewNodeCoords_bottom.push_back(node1coords);
-                    mapABCtoGlobal.push_back(nNodes);
-                    mNodalS.conservativeResize(nNodes + 1, 1);
-                    mNodalS[nNodes] = node1coords[0];
-                    mNodalZ.conservativeResize(nNodes + 1, 1);
-                    mNodalZ[nNodes] = node1coords[1];
-                    nNodes++;
-                    nNewNodes_bottom++;
-                }
-
-                newABCelem = {node0, node1, node2, node3};
-                mConnectivity.conservativeResize(nQuads + 1, 4);
-                mConnectivity.row(nQuads) = newABCelem;
-
-                for (int i = 0; i < mElementalVariableNames.size(); i++) {
-                    std::string vname = mElementalVariableNames[i];
-                    RDColX temp = mElementalVariables.at(vname);
-                    temp.conservativeResize(nQuads + 1,1);
-                    // handling gradients near the boundary -> only constant values from nodes at edge are passed on
-                    if (vname.substr(vname.length() - 2, 2) == std::string("_2")) {
-                        temp(nQuads) = mElementalVariables.at(vname.substr(0, vname.length() - 2) + "_1")(lowerB_Quad);
-                    } else if (vname.substr(vname.length() - 2, 2) == std::string("_3")) {
-                        temp(nQuads) = mElementalVariables.at(vname.substr(0, vname.length() - 2) + "_0")(lowerB_Quad);
-                    } else {
-                        temp(nQuads) = mElementalVariables.at(vname)(lowerB_Quad);
-                    }
-                    mElementalVariables.at(vname) = temp;
-                }
-                for (int i = 0; i < mSideSetNames.size(); i++) {
-                    IColX temp = mSideSets.at(mSideSetNames[i]);
-                    temp.conservativeResize(nQuads + 1,1);
-                    temp(nQuads) = mSideSets.at(mSideSetNames[i])(lowerB_Quad);
-                    mSideSets.at(mSideSetNames[i]) = temp;
-                }
-                mSideSets.at(mSSNameLowerB)(mSideSets.at(mSSNameLowerB).rows() - 1) = (n == mN_ABC) ? 0 : -1;
-
-                node2 = node1;
-                node3 = node0;
-
-                mABfield.push_back({1,iABCcopy-1});
-                nQuads++;
-            }
-
-            mSideSets.at(mSSNameLowerB)(nQuads - 1) = 0;
-        }
-    }
-}
-
 
 std::string ExodusModel::verbose() const {
     std::stringstream ss;
@@ -716,18 +487,10 @@ std::string ExodusModel::verbose() const {
     for (auto it = mSideSets.begin(); it != mSideSets.end(); it++) {
         ss << "    " << std::setw(widthname) << it->first << ":   ";
         int pair = 0;
-        for (int q = 0; q < mNumQuadsInner; q++) {
+        for (int q = 0; q < getNumQuads(); q++) {
             pair += (int)(it->second(q) >= 0);
         }
-        ss << pair;
-        if (hasABC()) {
-            pair = 0;
-            for (int q = mNumQuadsInner; q < getNumQuads(); q++) {
-                pair += (int)(it->second(q) >= 0);
-            }
-            ss << " normal + " << pair << " absorbing";
-        }
-        ss << " edges" << std::endl;
+        ss << pair << " edges" << std::endl;
     }
     ss << "  Miscellaneous_____________________________________________" << std::endl;
     ss << "    Distance Tolerance / m   =   " << mDistTolerance << std::endl;
@@ -744,13 +507,9 @@ void ExodusModel::buildInparam(ExodusModel *&exModel, const Parameters &par,
     if (exModel) {
         delete exModel;
     }
-
     std::string exfile = par.getValue<std::string>("MODEL_1D_EXODUS_MESH_FILE");
     exfile = Parameters::sInputDirectory + "/" + exfile;
     exModel = new ExodusModel(exfile);
-
-    exModel->mN_ABC = par.getValue<int>("ABC_ELEMENTS");
-
     exModel->initialize();
     if (verbose) {
         XMPI::cout << exModel->verbose();
@@ -804,7 +563,7 @@ bool ExodusModel::isIsotropic() const {
 }
 
 double ExodusModel::getElementalVariables(const std::string &varName, int quadTag) const {
-    if (varName == "element_type" || varName == "dt") {
+    if (varName == "element_type") {
         return mElementalVariables_elem.at(varName)(quadTag);
     }
     

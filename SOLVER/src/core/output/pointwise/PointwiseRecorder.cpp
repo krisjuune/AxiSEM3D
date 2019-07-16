@@ -31,7 +31,7 @@ void PointwiseRecorder::addReceiver(const std::string &name, const std::string &
 void PointwiseRecorder::initialize() {
     int numRec = mPointwiseInfo.size();
     mBufferDisp = RMatXX_RM::Zero(mBufferSize, numRec * 3);
-    mBufferTime = RColX::Zero(mBufferSize);
+    mBufferTime = RDColX::Zero(mBufferSize);
     int numStrainRec = 0;
     for (const auto &rec: mPointwiseInfo) {
         if (rec.mDumpStrain) {
@@ -59,7 +59,7 @@ void PointwiseRecorder::finalize() {
     }
 }
 
-void PointwiseRecorder::record(int tstep, Real t) {
+void PointwiseRecorder::record(int tstep, double t) {
     if (tstep % mRecordInterval != 0) {
         return;
     }
@@ -70,7 +70,7 @@ void PointwiseRecorder::record(int tstep, Real t) {
     // get disp
     static RRow3 gm;
     for (int irec = 0; irec < mPointwiseInfo.size(); irec++) {
-        // compute from element
+        // compute from element, in SPZ
         mPointwiseInfo[irec].mElement->computeGroundMotion(mPointwiseInfo[irec].mPhi, 
             mPointwiseInfo[irec].mWeights, gm);
         if (mComponents != "SPZ") {
@@ -100,7 +100,7 @@ void PointwiseRecorder::record(int tstep, Real t) {
     int istrain = 0;
     for (int irec = 0; irec < mPointwiseInfo.size(); irec++) {
         if (mPointwiseInfo[irec].mDumpStrain) {
-            // compute from element
+            // compute from element, in RTZ
             mPointwiseInfo[irec].mElement->computeStrain(mPointwiseInfo[irec].mPhi, 
                 mPointwiseInfo[irec].mWeights, strain);
             // write to buffer
@@ -114,9 +114,20 @@ void PointwiseRecorder::record(int tstep, Real t) {
     int icurl = 0;
     for (int irec = 0; irec < mPointwiseInfo.size(); irec++) {
         if (mPointwiseInfo[irec].mDumpCurl) {
-            // compute from element
+            // compute from element, in RTZ
             mPointwiseInfo[irec].mElement->computeCurl(mPointwiseInfo[irec].mPhi, 
                 mPointwiseInfo[irec].mWeights, curl);
+            if (mComponents == "ENZ") {
+                // transform
+                Real ur = curl(2);
+                Real ut = curl(0);
+                Real up = curl(1);
+                Real cosbaz = cos(mPointwiseInfo[irec].mBAz);
+                Real sinbaz = sin(mPointwiseInfo[irec].mBAz);
+                curl(0) = -ut * sinbaz + up * cosbaz;
+                curl(1) = -ut * cosbaz - up * sinbaz;
+                curl(2) = ur;
+            }        
             // write to buffer
             mBufferCurl.block(mBufferLine, icurl * 3, 1, 3) = curl;
             icurl++;

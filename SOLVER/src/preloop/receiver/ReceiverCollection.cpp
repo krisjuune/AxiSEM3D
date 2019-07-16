@@ -20,10 +20,15 @@
 #include "Mesh.h"
 #include "Quad.h"
 
-ReceiverCollection::ReceiverCollection(const std::string &fileRec, bool geographic,
-    double srcLat, double srcLon, double srcDep, int duplicated, bool saveSurf, bool kmconv):
-mInputFile(fileRec), mGeographic(geographic), mSaveWholeSurface(saveSurf),
-mSrcLat(srcLat), mSrcLon(srcLon), mSrcDep(srcDep) {
+#include "ExodusModel.h"
+#include "Geodesy.h"
+
+ReceiverCollection::ReceiverCollection(const std::string &fileRec, bool geographic, 
+    double srcLat, double srcLon, double srcDep, int duplicated, 
+    double saveSurfRadius, bool saveSurfUpper):
+mInputFile(fileRec), mGeographic(geographic), 
+mSrcLat(srcLat), mSrcLon(srcLon), mSrcDep(srcDep),
+mSaveSurfaceAtRadius(saveSurfRadius), mSaveSurfaceFromUpper(saveSurfUpper) {
     std::vector<std::string> name, network;
     std::vector<double> theta, phi, depth;
     std::vector<int> dumpStrain;
@@ -86,30 +91,29 @@ mSrcLat(srcLat), mSrcLon(srcLon), mSrcDep(srcDep) {
     // create receivers
     mWidthName = -1;
     mWidthNetwork = -1;
-    std::vector<std::string> recKeys;
     for (int i = 0; i < name.size(); i++) {
         // check duplicated
-        std::string key = network[i] + "." + name[i];
-        if (std::find(recKeys.begin(), recKeys.end(), key) != recKeys.end()) {
-            if (duplicated == 0) {
-                // ignore
-                continue;
-            } else if (duplicated == 1) {
-                // rename
-                int append = 0;
-                std::string nameOriginal = name[i];
-                while (std::find(recKeys.begin(), recKeys.end(), key) != recKeys.end()) {
-                    name[i] = nameOriginal + "__DUPLICATED" + boost::lexical_cast<std::string>(++append);
-                    key = network[i] + "." + name[i];
+        if (duplicated != 0) {
+            std::vector<std::string> recKeys;
+            std::string key = network[i] + "." + name[i];
+            if (std::find(recKeys.begin(), recKeys.end(), key) != recKeys.end()) {
+                if (duplicated == 1) {
+                    // rename
+                    int append = 0;
+                    std::string nameOriginal = name[i];
+                    while (std::find(recKeys.begin(), recKeys.end(), key) != recKeys.end()) {
+                        name[i] = nameOriginal + "__DUPLICATED" + boost::lexical_cast<std::string>(++append);
+                        key = network[i] + "." + name[i];
+                    }
+                } else {
+                    // error
+                    throw std::runtime_error("ReceiverCollection::ReceiverCollection || "
+                        "Duplicated station keys (network_name) found in station data file " + mInputFile + " || "
+                        "Name = " + name[i] + "; Network = " + network[i]);
                 }
-            } else {
-                // error
-                throw std::runtime_error("ReceiverCollection::ReceiverCollection || "
-                    "Duplicated station keys (network_name) found in station data file " + mInputFile + " || "
-                    "Name = " + name[i] + "; Network = " + network[i]);
             }
+            recKeys.push_back(key);
         }
-        recKeys.push_back(key);
         // add receiver
         mReceivers.push_back(new Receiver(name[i], network[i], 
             theta[i], phi[i], geographic, depth[i], (bool)dumpStrain[i], (bool)dumpCurl[i], 
@@ -125,14 +129,15 @@ ReceiverCollection::~ReceiverCollection() {
     }
 }
 
-void ReceiverCollection::release(Domain &domain, const Mesh &mesh) {
+void ReceiverCollection::release(Domain &domain, const Mesh &mesh, bool depthInRef) {
     // locate receivers
     MultilevelTimer::begin("Locate Receivers", 2);
     std::vector<int> recRank(mReceivers.size(), XMPI::nproc());
     std::vector<int> recETag(mReceivers.size(), -1);
-    std::vector<RDMatPP> recInterpFact(mReceivers.size(), RDMatPP::Zero());
+    std::vector<int> recQTag(mReceivers.size(), -1);
+    // std::vector<RDMatPP> recInterpFact(mReceivers.size(), RDMatPP::Zero());
     for (int irec = 0; irec < mReceivers.size(); irec++) {
-        bool found = mReceivers[irec]->locate(mesh, recETag[irec], recInterpFact[irec]);
+        bool found = mReceivers[irec]->locate(mesh, recETag[irec], recQTag[irec], depthInRef);
         if (found) {
             recRank[irec] = XMPI::rank();
         }
@@ -144,18 +149,28 @@ void ReceiverCollection::release(Domain &domain, const Mesh &mesh) {
     PointwiseRecorder *recorderPW = new PointwiseRecorder(
         mTotalRecordSteps, mRecordInterval, mBufferSize, mComponents,
         mSrcLat, mSrcLon, mSrcDep);
+    
+    MultilevelTimer::begin("Find Min Rank", 3);    
+    std::vector<int> recRankMinG(recRank);
+    XMPI::min(recRank, recRankMinG);    
+    MultilevelTimer::end("Find Min Rank", 3);
+    
+    MultilevelTimer::begin("Release receivers", 3);
     for (int irec = 0; irec < mReceivers.size(); irec++) {
-        int recRankMin = XMPI::min(recRank[irec]);
+        int recRankMin = recRankMinG[irec];
         if (recRankMin == XMPI::nproc()) {
             throw std::runtime_error("ReceiverCollection::release || Error locating receiver || " 
                 "Name = " + mReceivers[irec]->getName() + "; "
                 "Network = " + mReceivers[irec]->getNetwork());
         }
         if (recRankMin == XMPI::rank()) {
+            RDMatPP interpFact;
+            mReceivers[irec]->computeInterpFact(mesh, recQTag[irec], interpFact, depthInRef);
             mReceivers[irec]->release(*recorderPW, 
-                domain, recETag[irec], recInterpFact[irec]);
+                domain, recETag[irec], interpFact);
         }
     }
+    MultilevelTimer::end("Release receivers", 3);
     
     // IO
     for (const auto &io: mPointwiseIO) {
@@ -166,18 +181,28 @@ void ReceiverCollection::release(Domain &domain, const Mesh &mesh) {
     domain.setPointwiseRecorder(recorderPW);
     
     // whole surface
-    if (mSaveWholeSurface) {
+    if (mSaveSurfaceAtRadius > 0.) {
+        MultilevelTimer::begin("Whole Surface", 3);
         SurfaceRecorder *recorderSF = new SurfaceRecorder(mTotalRecordSteps, 
             mRecordInterval, mBufferSize, 
-            mSrcLat, mSrcLon, mSrcDep);
+            mSrcLat, mSrcLon, mSrcDep, mAssemble);
+        int nEdge  = 0;
         for (int iloc = 0; iloc < mesh.getNumQuads(); iloc++) {
             const Quad *quad = mesh.getQuad(iloc);
-            if (quad->onSurface()) {
+            if (quad->isFluid()) {
+                continue;
+            }
+            int edge = quad->edgeAtRadius(mSaveSurfaceAtRadius, 
+                mesh.getExodusModel()->getDistTolerance(), mSaveSurfaceFromUpper);
+            if (edge >= 0) {
                 Element *ele = domain.getElement(quad->getElementTag());
-                recorderSF->addElement(ele, quad->getSurfSide());
+                recorderSF->addElement(ele, edge);
+                nEdge++;
             }
         }
+        std::cout <<"Number of edges for surface output: "<<nEdge<<std::endl;
         domain.setSurfaceRecorder(recorderSF);
+        MultilevelTimer::end("Whole Surface", 3);
     }
     MultilevelTimer::end("Release to Domain", 2);
 }
@@ -195,8 +220,10 @@ std::string ReceiverCollection::verbose() const {
         ss << "    " << std::setw(mWidthName) << "..." << std::endl;
         ss << "    " << mReceivers[mReceivers.size() - 1]->verbose(mGeographic, mWidthName, mWidthNetwork) << std::endl;
     }
-    if (mSaveWholeSurface) {
+    if (mSaveSurfaceAtRadius > 0.) {
         ss << "  * Wavefield on the whole surface will be saved." << std::endl;
+        ss << "  * Radius / m = " << mSaveSurfaceAtRadius << std::endl;
+        ss << "  * From Upper = " << (mSaveSurfaceFromUpper ? "YES" : "NO") << std::endl;
     }
     ss << "========================= Receivers ========================\n" << std::endl;
     return ss.str();
@@ -232,11 +259,30 @@ void ReceiverCollection::buildInparam(ReceiverCollection *&rec, const Parameters
         throw std::runtime_error("ReceiverCollection::buildInparam || "
             "Invalid parameter, keyword = OUT_STATIONS_DUPLICATED.");
     }
-    bool saveSurf = par.getValue<bool>("OUT_STATIONS_WHOLE_SURFACE");
-    rec = new ReceiverCollection(recFile, geographic, srcLat, srcLon, srcDep,
-        duplicated, saveSurf, kmconv);
-
-    // options
+    
+    bool saveSurf = par.getValue<bool>("OUT_STATIONS_WHOLE_SURFACE", 0);
+    if (saveSurf) {
+        int size = par.getSize("OUT_STATIONS_WHOLE_SURFACE");
+        double r = 0;
+        bool upper = false;
+        if (size == 1) {
+            r = Geodesy::getROuter();
+            upper = false;
+        } else if (size == 2) {
+            r = par.getValue<double>("OUT_STATIONS_WHOLE_SURFACE", 1);
+            upper = false;
+        } else {
+            r = par.getValue<double>("OUT_STATIONS_WHOLE_SURFACE", 1);
+            upper = par.getValue<bool>("OUT_STATIONS_WHOLE_SURFACE", 2);
+        }
+        rec = new ReceiverCollection(recFile, geographic, srcLat, srcLon, srcDep, 
+            duplicated, r, upper); 
+    } else {
+        rec = new ReceiverCollection(recFile, geographic, srcLat, srcLon, srcDep, 
+            duplicated, -1, false); 
+    }
+    
+    // options 
     rec->mRecordInterval = par.getValue<int>("OUT_STATIONS_RECORD_INTERVAL");
     if (rec->mRecordInterval <= 0) {
         rec->mRecordInterval = 1;
@@ -285,11 +331,27 @@ void ReceiverCollection::buildInparam(ReceiverCollection *&rec, const Parameters
     if (ascii) {
         rec->mPointwiseIO.push_back(new PointwiseIOAscii());
     }
+    
+    // check netcdf options
+    if (netcdf && netcdf_no_assemble) {
+        throw std::runtime_error("ReceiverCollection::buildInparam || "
+            "Invalid parameter OUT_STATIONS_FORMAT, ||"
+            "netcdf and netcdf_no_assemble cannot coexist.");
+    }
+    #ifdef _USE_PARALLEL_NETCDF
+        if (netcdf_no_assemble) {
+            throw std::runtime_error("ReceiverCollection::buildInparam || "
+                "Invalid parameter OUT_STATIONS_FORMAT, ||"
+                "netcdf_no_assemble is not compatible with parallel NetCDF.");
+        }
+    #endif
+    
     if (netcdf) {
         rec->mPointwiseIO.push_back(new PointwiseIONetCDF(true));
     }
     if (netcdf_no_assemble) {
         rec->mPointwiseIO.push_back(new PointwiseIONetCDF(false));
+        rec->mAssemble = false;
     }
     
     if (verbose) {

@@ -15,12 +15,12 @@ class PointwiseIO;
 
 class ReceiverCollection {
 public:
-    ReceiverCollection(const std::string &fileRec, bool geographic,
-        double srcLat, double srcLon, double srcDep, int duplicated,
-        bool saveSurf, bool kmconv);
+    ReceiverCollection(const std::string &fileRec, bool geographic, 
+        double srcLat, double srcLon, double srcDep, int duplicated, 
+        double saveSurfRadius, bool saveSurfUpper);
     ~ReceiverCollection();
     
-    void release(Domain &domain, const Mesh &mesh); 
+    void release(Domain &domain, const Mesh &mesh, bool depthInRef); 
     
     std::string verbose() const;
     
@@ -51,7 +51,9 @@ private:
     int mWidthNetwork;
     
     // surface wavefield
-    bool mSaveWholeSurface;
+    double mSaveSurfaceAtRadius = -1.;
+    bool mSaveSurfaceFromUpper = false;
+    bool mAssemble = true;
     
     // source location
     double mSrcLat, mSrcLon, mSrcDep;

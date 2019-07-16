@@ -6,8 +6,8 @@
 #include "Mass.h"
 #include "MultilevelTimer.h"
 
-FluidPoint::FluidPoint(int nr, bool axial, const RDCol2 &crds, Mass *mass):
-Point(nr, axial, crds), mMass(mass) {
+FluidPoint::FluidPoint(int nr, bool axial, const RDCol2 &crds, Mass *mass, bool fluidSurf):
+Point(nr, axial, crds), mMass(mass), mFluidSurf(fluidSurf) {
     mDispl = CColX::Zero(mNu + 1, 1);
     mVeloc = CColX::Zero(mNu + 1, 1);
     mAccel = CColX::Zero(mNu + 1, 1);
@@ -20,26 +20,25 @@ FluidPoint::~FluidPoint() {
     delete mMass;
 }
 
-void FluidPoint::updateNewmark(Real dt) {
-    // calculate new acceleration
-      // mask stiff
+void FluidPoint::updateNewmark(double dt) {
+    
+    if (mFluidSurf) {
+        resetZero();
+        return;
+    }
+    
+    // mask stiff 
     maskField(mStiff);
       // compute accel inplace
     mMass->computeAccel(mStiff);
       // mask accel (masking must be called twice if mass is 3D)
     maskField(mStiff);
     // update dt
-    Real half_dt = half * dt;
-    Real half_dt_dt = half_dt * dt;
-    // update velocity and old acceleration
-    mVeloc += half_dt * (mAccel + mStiff);
+    double half_dt = half * dt;
+    double half_dt_dt = half_dt * dt;
+    mVeloc += (Real)half_dt * (mAccel + mStiff);
     mAccel = mStiff;
-    // update displacement
-    mDispl += dt * mVeloc + half_dt_dt * mAccel;
-
-    // absorbing boundaries
-    mAccel -= 2 * mGamma * mVeloc + mGamma * mGamma * mDispl;
-
+    mDispl += (Real)dt * mVeloc + (Real)half_dt_dt * mAccel;  
     // zero stiffness for next time step
     mStiff.setZero();
 }

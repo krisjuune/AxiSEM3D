@@ -7,9 +7,14 @@
 class NetCDF_Writer;
 class SurfaceInfo;
 #include "eigenc.h"
+#include "eigenp.h"
 
 class SurfaceIO {
 public:
+    SurfaceIO(bool assemble): mAssemble(assemble) {
+        // nothing
+    }
+    
     // before time loop
     void initialize(int totalRecordSteps, int bufferSize,
         const std::vector<SurfaceInfo> &surfaceInfo,
@@ -20,7 +25,7 @@ public:
     
     // dump to netcdf
     void dumpToFile(const std::vector<CMatXX_RM> &bufferDisp, 
-        const RColX &bufferTime, int bufferLine);
+        const RDColX &bufferTime, int bufferLine);
     
 private:
     // variable names
@@ -38,5 +43,8 @@ private:
     
     // source location
     double mSrcLat, mSrcLon, mSrcDep;
+    
+    // assemble or not
+    bool mAssemble = true;
 };
 

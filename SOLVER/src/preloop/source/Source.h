@@ -19,6 +19,7 @@ public:
     
     virtual ~Source() {};
     
+    virtual void release(Domain &domain, const Mesh &mesh) const;
     
     void release(Domain &domain, const Mesh &mesh, const Parameters &par) const;
     virtual std::string verbose() const = 0;

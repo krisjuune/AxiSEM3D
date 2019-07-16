@@ -13,7 +13,7 @@ class Element;
 class SurfaceRecorder {
 public:
     SurfaceRecorder(int totalRecordSteps, int recordInterval, int bufferSize,
-        double srcLat, double srcLon, double srcDep);
+        double srcLat, double srcLon, double srcDep, bool assemble);
     ~SurfaceRecorder();
 
     // add a surface element
@@ -26,7 +26,7 @@ public:
     void finalize();
 
     // record at a time step
-    void record(int tstep, Real t);
+    void record(int tstep, double t);
 
     // dump to netcdf
     void dumpToFile();
@@ -44,7 +44,7 @@ private:
     int mBufferLine;
     
     // buffer
-    RColX mBufferTime;
+    RDColX mBufferTime;
     std::vector<CMatXX_RM> mBufferDisp;
     
     // IO

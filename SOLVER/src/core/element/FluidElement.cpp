@@ -162,6 +162,9 @@ void FluidElement::test() const {
 }
 
 void FluidElement::computeGroundMotion(Real phi, const RMatPP &weights, RRow3 &u_spz) const {
+    // setup static
+    sResponse.setNr(mMaxNr);
+    
     // get displ from points
     int ipnt = 0;
     for (int ipol = 0; ipol <= nPol; ipol++) {
@@ -169,53 +172,42 @@ void FluidElement::computeGroundMotion(Real phi, const RMatPP &weights, RRow3 &u
             mPoints[ipnt++]->scatterDisplToElement(sResponse.mDispl, ipol, jpol, mMaxNu);
         }
     }
-
-    vec_ar3_CMatPP FluidDisp = vec_ar3_CMatPP(mMaxNu + 1, zero_ar3_CMatPP);
-    RMatXN3 &FluidDisp_r = SolverFFTW_N3::getR2C_RMat(mMaxNr);
-
-    mGradient->computeGrad(sResponse.mDispl, FluidDisp, mMaxNu, sResponse.mNyquist);
-    FieldFFT::transformF2P(FluidDisp, mMaxNr);
-    FluidDisp_r = SolverFFTW_N3::getC2R_RMat(mMaxNr);
-
-    if (mAcoustic->is1D()) {
-        RMatPP K = mAcoustic->getK1D();
-        for (int alpha = 0; alpha <= mMaxNu; alpha++) {
-            for (int i = 0; i < 3; i++) {
-                for (int ipol = 0; ipol <= nPol; ipol++) {
-                    for (int jpol = 0; jpol <= nPol; jpol++) {
-                        int ipnt = ipol * nPntEdge + jpol;
-                        FluidDisp_r(alpha, i * nPE + ipnt) *= K(ipol,jpol);
-                    }
-                }
-            }
-        }
-    } else {
-        RMatXN K = mAcoustic->getK3D();
-        for (int alpha = 0; alpha <= mMaxNu; alpha++) {
-            for (int i = 0; i < 3; i++) {
-                for (int ipnt = 0; ipnt < nPE; ipnt++) {
-                    FluidDisp_r(alpha, i * nPE + ipnt) *= K(alpha,ipnt);
-                }
-            }
-        }
+    
+    mGradient->computeGrad(sResponse.mDispl, sResponse.mStrain, sResponse.mNu, sResponse.mNyquist);
+    if (mInTIso) {
+        mCrdTransTIso->transformSPZ_RTZ(sResponse.mStrain, sResponse.mNu);
     }
-    FieldFFT::transformP2F(FluidDisp, mMaxNr);
-
+    if (mElem3D) {
+        FieldFFT::transformF2P(sResponse.mStrain, sResponse.mNr);
+    }
+    if (mHasPRT) {
+        mPRT->sphericalToUndulated(sResponse);
+    }    
+    mAcoustic->strainToStress(sResponse);
+    if (mHasPRT) {
+        mPRT->undulatedToSpherical(sResponse);
+    }
+    if (mElem3D) {
+        FieldFFT::transformP2F(sResponse.mStress, sResponse.mNr);
+    }
+    if (mInTIso) {
+        mCrdTransTIso->transformRTZ_SPZ(sResponse.mStress, sResponse.mNu);
+    }
+    
     // compute ground motion pointwise
     u_spz.setZero();
     for (int ipol = 0; ipol <= nPol; ipol++) {
         for (int jpol = 0; jpol <= nPol; jpol++) {
-            if (std::abs(weights(ipol, jpol)) < tinyDouble) continue;
-            Real up0 = FluidDisp[0][0](ipol, jpol).real();
-            Real up1 = FluidDisp[0][1](ipol, jpol).real();
-            Real up2 = FluidDisp[0][2](ipol, jpol).real();
+            // if (std::abs(weights(ipol, jpol)) < tinyDouble) continue;
+            Real up0 = sResponse.mStress[0][0](ipol, jpol).real();
+            Real up1 = sResponse.mStress[0][1](ipol, jpol).real();
+            Real up2 = sResponse.mStress[0][2](ipol, jpol).real();
             for (int alpha = 1; alpha <= mMaxNu - (int)(mMaxNr % 2 == 0); alpha++) {
                 Complex expval = two * exp((Real)alpha * phi * ii);
-                up0 += (expval * FluidDisp[alpha][0](ipol, jpol)).real();
-                up1 += (expval * FluidDisp[alpha][1](ipol, jpol)).real();
-                up2 += (expval * FluidDisp[alpha][2](ipol, jpol)).real();
+                up0 += (expval * sResponse.mStress[alpha][0](ipol, jpol)).real();
+                up1 += (expval * sResponse.mStress[alpha][1](ipol, jpol)).real();
+                up2 += (expval * sResponse.mStress[alpha][2](ipol, jpol)).real();
             }
-
             u_spz(0) += weights(ipol, jpol) * up0;
             u_spz(1) += weights(ipol, jpol) * up1;
             u_spz(2) += weights(ipol, jpol) * up2;
@@ -223,14 +215,82 @@ void FluidElement::computeGroundMotion(Real phi, const RMatPP &weights, RRow3 &u
     }
 }
 
+#include "SolidElement.h"
 void FluidElement::computeStrain(Real phi, const RMatPP &weights, RRow6 &strain) const {
-    throw std::runtime_error("FluidElement::computeStrain || "
-        "Not implemented."); 
+    // setup static
+    sResponse.setNr(mMaxNr);
+    
+    // get displ from points
+    int ipnt = 0;
+    for (int ipol = 0; ipol <= nPol; ipol++) {
+        for (int jpol = 0; jpol <= nPol; jpol++) {
+            mPoints[ipnt++]->scatterDisplToElement(sResponse.mDispl, ipol, jpol, mMaxNu);
+        }
+    }
+    
+    mGradient->computeGrad(sResponse.mDispl, sResponse.mStrain, sResponse.mNu, sResponse.mNyquist);
+    if (mInTIso) {
+        mCrdTransTIso->transformSPZ_RTZ(sResponse.mStrain, sResponse.mNu);
+    }
+    if (mElem3D) {
+        FieldFFT::transformF2P(sResponse.mStrain, sResponse.mNr);
+    }
+    if (mHasPRT) {
+        mPRT->sphericalToUndulated(sResponse);
+    }    
+    mAcoustic->strainToStress(sResponse);
+    if (mHasPRT) {
+        mPRT->undulatedToSpherical(sResponse);
+    }
+    if (mElem3D) {
+        FieldFFT::transformP2F(sResponse.mStress, sResponse.mNr);
+    }
+    if (mInTIso) {
+        mCrdTransTIso->transformRTZ_SPZ(sResponse.mStress, sResponse.mNu);
+    }
+    
+    //////////////////////
+    if (mHasPRT) {
+        throw std::runtime_error("FluidElement::computeStrain || "
+            "Not implemented."); 
+    } else {
+        mGradient->computeGrad6(sResponse.mStress, SolidElement::sResponse.mStrain6, 
+            sResponse.mNu, sResponse.mNyquist);
+    }
+    
+    //////////////
+    strain.setZero();
+    for (int ipol = 0; ipol <= nPol; ipol++) {
+        for (int jpol = 0; jpol <= nPol; jpol++) {
+            if (std::abs(weights(ipol, jpol)) < tinyDouble) continue;
+            Real s0 = SolidElement::sResponse.mStrain6[0][0](ipol, jpol).real();
+            Real s1 = SolidElement::sResponse.mStrain6[0][1](ipol, jpol).real();
+            Real s2 = SolidElement::sResponse.mStrain6[0][2](ipol, jpol).real();
+            Real s3 = SolidElement::sResponse.mStrain6[0][3](ipol, jpol).real();
+            Real s4 = SolidElement::sResponse.mStrain6[0][4](ipol, jpol).real();
+            Real s5 = SolidElement::sResponse.mStrain6[0][5](ipol, jpol).real();
+            for (int alpha = 1; alpha <= mMaxNu - (int)(mMaxNr % 2 == 0); alpha++) {
+                Complex expval = two * exp((Real)alpha * phi * ii);
+                s0 += (expval * SolidElement::sResponse.mStrain6[alpha][0](ipol, jpol)).real();
+                s1 += (expval * SolidElement::sResponse.mStrain6[alpha][1](ipol, jpol)).real();
+                s2 += (expval * SolidElement::sResponse.mStrain6[alpha][2](ipol, jpol)).real();
+                s3 += (expval * SolidElement::sResponse.mStrain6[alpha][3](ipol, jpol)).real();
+                s4 += (expval * SolidElement::sResponse.mStrain6[alpha][4](ipol, jpol)).real();
+                s5 += (expval * SolidElement::sResponse.mStrain6[alpha][5](ipol, jpol)).real();
+            }
+            strain(0) += weights(ipol, jpol) * s0;
+            strain(1) += weights(ipol, jpol) * s1;
+            strain(2) += weights(ipol, jpol) * s2;
+            strain(3) += weights(ipol, jpol) * s3;
+            strain(4) += weights(ipol, jpol) * s4;
+            strain(5) += weights(ipol, jpol) * s5;
+        }
+    }
 }
 
 void FluidElement::computeCurl(Real phi, const RMatPP &weights, RRow3 &curl) const {
-    throw std::runtime_error("FluidElement::computeCurl || "
-        "Not implemented."); 
+    // no curl in fluid
+    curl.setZero();
 }
 
 void FluidElement::forceTIso() {

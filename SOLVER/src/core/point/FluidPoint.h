@@ -10,12 +10,12 @@ class Mass;
 class FluidPoint: public Point {
     friend class SolidFluidPoint;
 
-public:
-    FluidPoint(int nr, bool axial, const RDCol2 &crds, Mass *mass, const double gamma);
+public:    
+    FluidPoint(int nr, bool axial, const RDCol2 &crds, Mass *mass, bool fluidSurf);
     ~FluidPoint();
 
     // update in time domain by Newmark
-    void updateNewmark(Real dt);
+    void updateNewmark(double dt);
     
     // check stability
     bool stable() const {return mDispl.allFinite();};
@@ -74,9 +74,8 @@ private:
     // mass
     Mass *mMass;
     
-    // ABC factor
-    double mGamma;
-
+    bool mFluidSurf = false;
+    
     // wisdom
     Real mMaxDisplWisdom = -1.;
     int mNuWisdom = 0;

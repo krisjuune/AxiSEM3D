@@ -212,6 +212,7 @@ void Volumetric3D_crust1::initialize(const std::vector<std::string> &params) {
         Parameters::castValue(mIncludeIce, params.at(ipar++), source);
         Parameters::castValue(mGeographic, params.at(ipar++), source);
         Parameters::castValue(mRMoho, params.at(ipar++), source); mRMoho *= 1e3;
+        Parameters::castValue(mRSurf, params.at(ipar++), source); mRSurf *= 1e3;
     } catch (std::out_of_range) {
         // nothing
     }
@@ -220,6 +221,14 @@ void Volumetric3D_crust1::initialize(const std::vector<std::string> &params) {
     for (int i = 0; i < mElementBoundaries.size(); i++) {
         if (mElementBoundaries[i] < mRMoho - 1.) {
             mElementBoundaries.erase(mElementBoundaries.begin() + i, mElementBoundaries.end());
+            break;
+        }
+    }
+    
+    // delete element boundaries out of crust
+    for (int i = mElementBoundaries.size() - 1; i >= 0; i--) {
+        if (mElementBoundaries[i] > mRSurf + 1.) {
+            mElementBoundaries.erase(mElementBoundaries.begin(), mElementBoundaries.begin() + i + 1);
             break;
         }
     }

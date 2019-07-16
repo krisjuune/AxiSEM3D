@@ -199,12 +199,12 @@ mQuadTag(quadTag) {
                 throw std::runtime_error("Quad::Quad || Conflict in surface setting.");
             }
         }
-        if (mIsFluid) {
-            throw std::runtime_error("Quad::Quad || Fluid element on surface. Not implemented.");
-        }
-        if (mOnSFBoundary) {
-            throw std::runtime_error("Quad::Quad || Element on both surface and solid-fluid boundary.");
-        }
+        // if (mIsFluid) {
+        //     throw std::runtime_error("Quad::Quad || Fluid element on surface. Not implemented.");
+        // }
+        // if (mOnSFBoundary) {
+        //     throw std::runtime_error("Quad::Quad || Element on both surface and solid-fluid boundary.");
+        // }
     }
     
     // nr field 
@@ -221,7 +221,8 @@ mQuadTag(quadTag) {
     mMaterial = new Material(this, exModel);
     
     // relabelling
-    mRelabelling = new Relabelling(this);
+    // mRelabelling = new Relabelling(this);
+    mRelabelling = 0;
     
     // dt 
     mDeltaTRef = exModel.getElementalVariables("dt", mQuadTag);
@@ -247,7 +248,9 @@ mQuadTag(quadTag) {
 Quad::~Quad() {
     delete mMapping;
     delete mMaterial;
-    delete mRelabelling;
+    if (mRelabelling) {
+        delete mRelabelling;
+    }
 }
 
 void Quad::addVolumetric3D(const std::vector<Volumetric3D *> &m3D, 
@@ -257,7 +260,10 @@ void Quad::addVolumetric3D(const std::vector<Volumetric3D *> &m3D,
 
 void Quad::addGeometric3D(const std::vector<Geometric3D *> &g3D, 
     double srcLat, double srcLon, double srcDep, double phi2D) {
-    mRelabelling->addUndulation(g3D, srcLat, srcLon, srcDep, phi2D);
+    if (g3D.size() > 0) {
+        mRelabelling = new Relabelling(this);
+        mRelabelling->addUndulation(g3D, srcLat, srcLon, srcDep, phi2D);
+    }    
 }
 
 void Quad::setOceanLoad3D(const OceanLoad3D &o3D, 
@@ -291,7 +297,10 @@ void Quad::setOceanLoad3D(const OceanLoad3D &o3D,
 }
 
 bool Quad::hasRelabelling() const {
-    return !mRelabelling->isZero();
+    if (!mRelabelling) {
+        return false;
+    }
+    return !(mRelabelling->isZero());
 }
 
 double Quad::getDeltaT() const {
@@ -410,7 +419,10 @@ int Quad::release(Domain &domain, const IMatPP &myPointTags, const AttBuilder *a
 }
 
 int Quad::releaseSolid(Domain &domain, const IMatPP &myPointTags, const AttBuilder *attBuild) const {
-    bool elem1D = mRelabelling->isPar1D() && mMaterial->isSolidPar1D(attBuild != 0);
+    bool elem1D = mMaterial->isSolidPar1D(attBuild != 0);
+    if (hasRelabelling()) {
+        elem1D = elem1D && mRelabelling->isPar1D();
+    }
     std::array<Point *, nPntElem> points;
     for (int ipol = 0; ipol <= nPol; ipol++) {
         for (int jpol = 0; jpol <= nPol; jpol++) {
@@ -418,14 +430,17 @@ int Quad::releaseSolid(Domain &domain, const IMatPP &myPointTags, const AttBuild
         }
     }
     Gradient *grad = createGraident();
-    PRT *prt = mRelabelling->createPRT(elem1D);
+    PRT *prt = mRelabelling ? mRelabelling->createPRT(elem1D) : 0;
     Elastic *elas = mMaterial->createElastic(elem1D, attBuild);
     Element *elem = new SolidElement(grad, prt, points, elas);
     return domain.addElement(elem);
 }
 
 int Quad::releaseFluid(Domain &domain, const IMatPP &myPointTags) const {
-    bool elem1D = mRelabelling->isPar1D() && mMaterial->isFluidPar1D();
+    bool elem1D = mMaterial->isFluidPar1D();
+    if (hasRelabelling()) {
+        elem1D = elem1D && mRelabelling->isPar1D();
+    }
     std::array<Point *, nPntElem> points;
     for (int ipol = 0; ipol <= nPol; ipol++) {
         for (int jpol = 0; jpol <= nPol; jpol++) {
@@ -433,7 +448,7 @@ int Quad::releaseFluid(Domain &domain, const IMatPP &myPointTags) const {
         }
     }
     Gradient *grad = createGraident();
-    PRT *prt = mRelabelling->createPRT(elem1D);
+    PRT *prt = mRelabelling ? mRelabelling->createPRT(elem1D) : 0;
     Acoustic *acous = mMaterial->createAcoustic(elem1D);
     Element *elem = new FluidElement(grad, prt, points, acous);
     return domain.addElement(elem);
@@ -735,7 +750,11 @@ RDMatX3 Quad::computeNormal(int side, int ipol, int jpol) const {
 }
 
 RDRowN Quad::getUndulationOnSlice(double phi) const {
-    return XMath::computeFourierAtPhi(mRelabelling->getDeltaR(), phi);
+    if (hasRelabelling()) {
+        return XMath::computeFourierAtPhi(mRelabelling->getDeltaR(), phi);
+    } else {
+        return RDRowN::Zero();
+    }
 }
 
 RDRowN Quad::getMaterialOnSlice(const std::string &parName, int refType, double phi) const {
@@ -758,4 +777,31 @@ bool Quad::nearMe(double s, double z) const {
     }
     return true;
 }
+
+#include <iostream>
+int Quad::edgeAtRadius(double radius, double distTol, bool upper) const {
+    double r0 = mNodalCoords.col(0).norm();
+    double r1 = mNodalCoords.col(1).norm();
+    double r2 = mNodalCoords.col(2).norm();
+    double r3 = mNodalCoords.col(3).norm();
+    double rc = (r0 + r1 + r2 + r3) / 4;
+    if (upper != (rc > radius)) {
+        return -1;
+    }
+    
+    if (std::abs(r0 - radius) < distTol && std::abs(r1 - radius) < distTol) {
+        return 0;
+    }
+    if (std::abs(r1 - radius) < distTol && std::abs(r2 - radius) < distTol) {
+        return 1;
+    }
+    if (std::abs(r2 - radius) < distTol && std::abs(r3 - radius) < distTol) {
+        return 2;
+    }
+    if (std::abs(r3 - radius) < distTol && std::abs(r0 - radius) < distTol) {
+        return 3;
+    }
+    return -1;
+}
+
 

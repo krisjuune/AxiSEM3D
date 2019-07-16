@@ -20,15 +20,21 @@ SolidPoint::~SolidPoint() {
     delete mMass;
 }
 
+<<<<<<< HEAD
 void SolidPoint::updateNewmark(Real dt) {
     // calculate new acceleration
       // mask stiff
+=======
+void SolidPoint::updateNewmark(double dt) {
+    // mask stiff 
+>>>>>>> upstream/master
     maskField(mStiff);
       // compute accel inplace
     mMass->computeAccel(mStiff);
       // mask accel (masking must be called twice if mass is 3D)
     maskField(mStiff);
     // update dt
+<<<<<<< HEAD
     Real half_dt = half * dt;
     Real half_dt_dt = half_dt * dt;
     // update velocity and old acceleration
@@ -40,6 +46,13 @@ void SolidPoint::updateNewmark(Real dt) {
     // absorbing boundaries
     mAccel -= 2 * mGamma * mVeloc + mGamma * mGamma * mDispl;
 
+=======
+    double half_dt = half * dt;
+    double half_dt_dt = half_dt * dt;
+    mVeloc += (Real)half_dt * (mAccel + mStiff);
+    mAccel = mStiff;
+    mDispl += (Real)dt * mVeloc + (Real)half_dt_dt * mAccel;  
+>>>>>>> upstream/master
     // zero stiffness for next time step
     mStiff.setZero();
 }
