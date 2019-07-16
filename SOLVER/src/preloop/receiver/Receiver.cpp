@@ -16,11 +16,12 @@
 #include <iomanip>
 #include "XMPI.h"
 
-Receiver::Receiver(const std::string &name, const std::string &network,
-    double theta_lat, double phi_lon, bool geographic,
-    double depth, double srcLat, double srcLon, double srcDep,
+Receiver::Receiver(const std::string &name, const std::string &network, 
+    double theta_lat, double phi_lon, bool geographic, 
+    double depth, bool dumpStrain, bool dumpCurl,
+    double srcLat, double srcLon, double srcDep,
     bool kmconv):
-mName(name), mNetwork(network), mDepth(depth) {
+mName(name), mNetwork(network), mDepth(depth), mDumpStrain(dumpStrain), mDumpCurl(dumpCurl) {
     RDCol3 rtpG, rtpS;
     if (geographic) {
         rtpG(0) = 1.;
@@ -50,8 +51,11 @@ mName(name), mNetwork(network), mDepth(depth) {
 void Receiver::release(PointwiseRecorder &recorderPW, const Domain &domain, 
     int elemTag, const RDMatPP &interpFact) {
     Element *myElem = domain.getElement(elemTag);
+    if (mDumpStrain || mDumpCurl) {
+        myElem->forceTIso();
+    }
     recorderPW.addReceiver(mName, mNetwork, mPhi, interpFact, myElem, mTheta, mBackAzimuth,
-        mLat, mLon, mDepth);
+        mLat, mLon, mDepth, mDumpStrain, mDumpCurl);
 }
 
 bool Receiver::locate(const Mesh &mesh, int &elemTag, RDMatPP &interpFact) const {

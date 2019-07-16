@@ -49,6 +49,9 @@ public:
     
     // compute Real displacement, used by receiver
     void computeGroundMotion(Real phi, const RMatPP &weights, RRow3 &u_spz) const; 
+    void computeStrain(Real phi, const RMatPP &weights, RRow6 &strain) const; 
+    void computeCurl(Real phi, const RMatPP &weights, RRow3 &curl) const; 
+    void forceTIso();
     
     // side-wise
     void feedDispOnSide(int side, CMatXX_RM &buffer, int row) const; 

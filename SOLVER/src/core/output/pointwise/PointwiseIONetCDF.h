@@ -9,6 +9,10 @@ class NetCDF_Writer;
 
 class PointwiseIONetCDF: public PointwiseIO {
 public:
+    PointwiseIONetCDF(bool assemble): mAssemble(assemble) {
+        // nothing
+    }
+    
     // before time loop
     void initialize(int totalRecordSteps, int bufferSize, 
         const std::string &components, const std::vector<PointwiseInfo> &receivers, 
@@ -18,12 +22,21 @@ public:
     void finalize();
     
     // dump to user-specified format
-    void dumpToFile(const RMatXX_RM &bufferDisp, const RColX &bufferTime, int bufferLine);
+    void dumpToFile(const RMatXX_RM &bufferDisp, 
+        const RMatXX_RM &bufferStrain, 
+        const RMatXX_RM &bufferCurl, 
+        const RColX &bufferTime, int bufferLine);
     
 private:
-    // variable names
-    std::vector<std::string> mVarNames;
+    // receivers
     const std::vector<PointwiseInfo> *mReceivers;
+    
+    // variable names
+    std::vector<std::string> mVarNamesDisp;
+    std::vector<std::string> mVarNamesStrain;
+    std::vector<int> mStrainIndex;
+    std::vector<std::string> mVarNamesCurl;
+    std::vector<int> mCurlIndex;
     
     // file ID
     NetCDF_Writer *mNetCDF = 0;
@@ -36,5 +49,8 @@ private:
     
     // source location
     double mSrcLat, mSrcLon, mSrcDep;
+    
+    // assemble or not
+    bool mAssemble = true;
 };
 

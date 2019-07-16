@@ -68,6 +68,9 @@ public:
     
     static void buildInparam(ExodusModel *&exModel, const Parameters &par, 
         AttParameters *&attPar, int verbose);
+        
+    // double getR_CMB() const {return mR_CMB;};
+    // double getR_ICB() const {return mR_ICB;};
     
 private:
     

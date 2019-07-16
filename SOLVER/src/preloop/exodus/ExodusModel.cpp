@@ -93,13 +93,28 @@ void ExodusModel::readRawData() {
         mSideSetValues.col(i) = values;
     }
     
-    // ellipticity
-    try {
-      reader.read2D("ellipticity", dbuffer);
-      mEllipKnots = dbuffer.row(0).transpose();
-      mEllipCoeffs = dbuffer.row(1).transpose();
-    } catch (...) {std::cout << "no ellipticity argument" << std::endl;}
-
+    // do not read ellipticity for cartesian
+    bool cartesian = false;
+    for (int i = 0; i < mGlobalRecordsRaw.size(); i++) {
+        std::vector<std::string> substrs = Parameters::splitString(mGlobalRecordsRaw[i], "=");
+        if (boost::iequals(boost::trim_copy(substrs[0]), "crdsys") && 
+            boost::iequals(boost::trim_copy(substrs[1]), "cartesian")) {
+            cartesian = true;
+            break;
+        }
+    }
+    if (cartesian) {
+        mEllipKnots = RDColX::Zero(0);
+        mEllipCoeffs = RDColX::Zero(0);
+        // set radius to PREM 
+        mGlobalVariables.insert(std::pair<std::string, double>("radius", 6371e3));
+    } else {
+        // ellipticity
+        reader.read2D("ellipticity", dbuffer);
+        mEllipKnots = dbuffer.row(0).transpose();
+        mEllipCoeffs = dbuffer.row(1).transpose();
+    }
+    
     // close file
     reader.close();
 }
@@ -371,6 +386,25 @@ void ExodusModel::formAuxiliary() {
         }
     }
     MultilevelTimer::end("Process Exodus Check Ocean", 2);
+    
+    // CMB and ICB
+    // MultilevelTimer::begin("Process Exodus CMB & ICB", 2);
+    // mR_CMB = DBL_MIN;
+    // mR_ICB = DBL_MAX;
+    // for (int i = 0; i < getNumQuads(); i++) {
+    //     bool isFluid = getElementalVariables("fluid", i) > .5;
+    //     bool isAxis = getSideAxis(i) >= 0;
+    //     if (isFluid && isAxis) {
+    //         for (int j = 0; j < 4; j++) {
+    //             double s = mNodalS(mConnectivity(i, j));
+    //             double z = mNodalZ(mConnectivity(i, j));
+    //             double r = std::sqrt(s * s + z * z);
+    //             mR_CMB = std::max(mR_CMB, r);
+    //             mR_ICB = std::min(mR_ICB, r);
+    //         }
+    //     }
+    // }
+    // MultilevelTimer::end("Process Exodus CMB & ICB", 2);
 }
 
 void ExodusModel::AddAbsorbingBoundaryElements() {

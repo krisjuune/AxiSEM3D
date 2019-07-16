@@ -13,14 +13,14 @@ class PointwiseRecorder;
 
 class Receiver {
 public:
-    Receiver(const std::string &name, const std::string &network,
-        double theta_lat, double phi_lon, bool geographic,
-        double depth, double srcLat, double srcLon, double srcDep,
-        bool kmconv);
-
-    void release(PointwiseRecorder &recorderPW, const Domain &domain,
-        int elemTag, const RDMatPP &interpFact);
-
+    Receiver(const std::string &name, const std::string &network, 
+        double theta_lat, double phi_lon, bool geographic, 
+        double depth, bool dumpStrain, bool dumpCurl, 
+        double srcLat, double srcLon, double srcDep, bool kmconv);
+    
+    void release(PointwiseRecorder &recorderPW, const Domain &domain, 
+        int elemTag, const RDMatPP &interpFact);     
+    
     bool locate(const Mesh &mesh, int &elemTag, RDMatPP &interpFact) const;
     
     std::string verbose(bool geographic, int wname, int wnet) const;
@@ -35,5 +35,7 @@ private:
     double mLat, mLon;
     double mDepth;
     double mBackAzimuth;
+    bool mDumpStrain;
+    bool mDumpCurl;
 };
 

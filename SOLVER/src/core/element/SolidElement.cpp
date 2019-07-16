@@ -88,6 +88,8 @@ double SolidElement::measure(int count) const {
             mPoints[ipnt++]->resetZero();
         }
     }
+    // reset Elastic
+    mElastic->resetZero();
     return elapsed_time / count;
 }
 
@@ -213,6 +215,140 @@ void SolidElement::computeGroundMotion(Real phi, const RMatPP &weights, RRow3 &u
     }
 }
 
+#include "SolverFFTW_N6.h"
+void SolidElement::computeStrain(Real phi, const RMatPP &weights, RRow6 &strain) const {
+    // setup static
+    sResponse.setNr(mMaxNr);
+    
+    // get displ from points
+    int ipnt = 0;
+    for (int ipol = 0; ipol <= nPol; ipol++) {
+        for (int jpol = 0; jpol <= nPol; jpol++) {
+            mPoints[ipnt++]->scatterDisplToElement(sResponse.mDispl, ipol, jpol, mMaxNu);
+        }
+    }
+    
+    if (mHasPRT) {
+        mGradient->computeGrad9(sResponse.mDispl, sResponse.mStrain9, sResponse.mNu, sResponse.mNyquist);
+        mCrdTransTIso->transformSPZ_RTZ(sResponse.mStrain9, sResponse.mNu);
+        if (mElem3D) {
+            FieldFFT::transformF2P(sResponse.mStrain9, sResponse.mNr);
+            // OUT: SolverFFTW_N9::getC2R_RMat
+            mPRT->sphericalToUndulated(sResponse);
+            // OUT: SolverFFTW_N6::getC2R_RMat
+            SolverFFTW_N6::getR2C_RMat(sResponse.mNr) = SolverFFTW_N6::getC2R_RMat(sResponse.mNr);
+            // OUT: SolverFFTW_N6::getR2C_RMat
+            FieldFFT::transformP2F(sResponse.mStrain6, sResponse.mNr);
+        } else {
+            mPRT->sphericalToUndulated(sResponse);
+        }
+    } else {
+        mGradient->computeGrad6(sResponse.mDispl, sResponse.mStrain6, sResponse.mNu, sResponse.mNyquist);
+        mCrdTransTIso->transformSPZ_RTZ(sResponse.mStrain6, sResponse.mNu);
+    }
+    
+    //////////////
+    strain.setZero();
+    for (int ipol = 0; ipol <= nPol; ipol++) {
+        for (int jpol = 0; jpol <= nPol; jpol++) {
+            if (std::abs(weights(ipol, jpol)) < tinyDouble) continue;
+            Real s0 = sResponse.mStrain6[0][0](ipol, jpol).real();
+            Real s1 = sResponse.mStrain6[0][1](ipol, jpol).real();
+            Real s2 = sResponse.mStrain6[0][2](ipol, jpol).real();
+            Real s3 = sResponse.mStrain6[0][3](ipol, jpol).real();
+            Real s4 = sResponse.mStrain6[0][4](ipol, jpol).real();
+            Real s5 = sResponse.mStrain6[0][5](ipol, jpol).real();
+            for (int alpha = 1; alpha <= mMaxNu - (int)(mMaxNr % 2 == 0); alpha++) {
+                Complex expval = two * exp((Real)alpha * phi * ii);
+                s0 += (expval * sResponse.mStrain6[alpha][0](ipol, jpol)).real();
+                s1 += (expval * sResponse.mStrain6[alpha][1](ipol, jpol)).real();
+                s2 += (expval * sResponse.mStrain6[alpha][2](ipol, jpol)).real();
+                s3 += (expval * sResponse.mStrain6[alpha][3](ipol, jpol)).real();
+                s4 += (expval * sResponse.mStrain6[alpha][4](ipol, jpol)).real();
+                s5 += (expval * sResponse.mStrain6[alpha][5](ipol, jpol)).real();
+            }
+            strain(0) += weights(ipol, jpol) * s0;
+            strain(1) += weights(ipol, jpol) * s1;
+            strain(2) += weights(ipol, jpol) * s2;
+            strain(3) += weights(ipol, jpol) * s3;
+            strain(4) += weights(ipol, jpol) * s4;
+            strain(5) += weights(ipol, jpol) * s5;
+        }
+    }
+}
+
+#include "SolverFFTW_N9.h"
+void SolidElement::computeCurl(Real phi, const RMatPP &weights, RRow3 &curl) const {
+    // setup static
+    sResponse.setNr(mMaxNr);
+    
+    // get displ from points
+    int ipnt = 0;
+    for (int ipol = 0; ipol <= nPol; ipol++) {
+        for (int jpol = 0; jpol <= nPol; jpol++) {
+            mPoints[ipnt++]->scatterDisplToElement(sResponse.mDispl, ipol, jpol, mMaxNu);
+        }
+    }
+    
+    if (mHasPRT) {
+        mGradient->computeGrad9(sResponse.mDispl, sResponse.mStrain9, sResponse.mNu, sResponse.mNyquist);
+        mCrdTransTIso->transformSPZ_RTZ(sResponse.mStrain9, sResponse.mNu);
+        if (mElem3D) {
+            FieldFFT::transformF2P(sResponse.mStrain9, sResponse.mNr);
+            // OUT: SolverFFTW_N9::getC2R_RMat
+            mPRT->sphericalToUndulated9(sResponse);
+            // OUT: SolverFFTW_N9::getC2R_RMat
+            SolverFFTW_N9::getR2C_RMat(sResponse.mNr) = SolverFFTW_N9::getC2R_RMat(sResponse.mNr);
+            // OUT: SolverFFTW_N9::getR2C_RMat
+            FieldFFT::transformP2F(sResponse.mStrain9, sResponse.mNr);
+        } else {
+            mPRT->sphericalToUndulated9(sResponse);
+        }
+    } else {
+        mGradient->computeGrad9(sResponse.mDispl, sResponse.mStrain9, sResponse.mNu, sResponse.mNyquist);
+        mCrdTransTIso->transformSPZ_RTZ(sResponse.mStrain9, sResponse.mNu);
+    }
+    
+    //////////////
+    curl.setZero();
+    for (int ipol = 0; ipol <= nPol; ipol++) {
+        for (int jpol = 0; jpol <= nPol; jpol++) {
+            if (std::abs(weights(ipol, jpol)) < tinyDouble) continue;
+            // Real dURdR = sResponse.mStrain9[0][0](ipol, jpol).real();
+            Real dURdT = sResponse.mStrain9[0][1](ipol, jpol).real();
+            Real dURdZ = sResponse.mStrain9[0][2](ipol, jpol).real();
+            Real dUTdR = sResponse.mStrain9[0][3](ipol, jpol).real();
+            // Real dUTdT = sResponse.mStrain9[0][4](ipol, jpol).real();
+            Real dUTdZ = sResponse.mStrain9[0][5](ipol, jpol).real();
+            Real dUZdR = sResponse.mStrain9[0][6](ipol, jpol).real();
+            Real dUZdT = sResponse.mStrain9[0][7](ipol, jpol).real();
+            // Real dUZdZ = sResponse.mStrain9[0][8](ipol, jpol).real();
+            for (int alpha = 1; alpha <= mMaxNu - (int)(mMaxNr % 2 == 0); alpha++) {
+                Complex expval = two * exp((Real)alpha * phi * ii);
+                // dURdR += (expval * sResponse.mStrain9[alpha][0](ipol, jpol)).real();
+                dURdT += (expval * sResponse.mStrain9[alpha][1](ipol, jpol)).real();
+                dURdZ += (expval * sResponse.mStrain9[alpha][2](ipol, jpol)).real();
+                dUTdR += (expval * sResponse.mStrain9[alpha][3](ipol, jpol)).real();
+                // dUTdT += (expval * sResponse.mStrain9[alpha][4](ipol, jpol)).real();
+                dUTdZ += (expval * sResponse.mStrain9[alpha][5](ipol, jpol)).real();
+                dUZdR += (expval * sResponse.mStrain9[alpha][6](ipol, jpol)).real();
+                dUZdT += (expval * sResponse.mStrain9[alpha][7](ipol, jpol)).real();
+                // dUZdZ += (expval * sResponse.mStrain9[alpha][8](ipol, jpol)).real();
+            }
+            curl(0) += weights(ipol, jpol) * (dUZdT - dUTdZ);
+            curl(1) += weights(ipol, jpol) * (dURdZ - dUZdR);
+            curl(2) += weights(ipol, jpol) * (dUTdR - dURdT);
+        }
+    }
+}
+
+void SolidElement::forceTIso() {
+    if (mCrdTransTIso == 0) {
+        mCrdTransTIso = new CrdTransTIsoSolid(formThetaMat());
+        mInTIso = true;
+    } 
+}
+
 void SolidElement::feedDispOnSide(int side, CMatXX_RM &buffer, int row) const {
     int ipol0 = 0, ipol1 = 0, jpol0 = 0, jpol1 = 0;
     if (side == 0) {
@@ -257,6 +393,10 @@ std::string SolidElement::verbose() const {
     } else {
         return "SolidElement$" + mElastic->verbose();
     }
+}
+
+void SolidElement::resetZero() {
+    mElastic->resetZero();
 }
 
 void SolidElement::displToStiff() const {

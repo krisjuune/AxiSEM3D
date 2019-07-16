@@ -28,6 +28,9 @@ public:
     
     // compute Real displacement, used by receiver
     virtual void computeGroundMotion(Real phi, const RMatPP &weights, RRow3 &u_spz) const = 0; 
+    virtual void computeStrain(Real phi, const RMatPP &weights, RRow6 &strain) const = 0; 
+    virtual void computeCurl(Real phi, const RMatPP &weights, RRow3 &curl) const = 0; 
+    virtual void forceTIso() = 0; 
     
     // side-wise
     virtual void feedDispOnSide(int side, CMatXX_RM &buffer, int row) const = 0; 
@@ -62,6 +65,9 @@ public:
 
     // form theta for TIso
     RDMatPP formThetaMat() const;
+    
+    // reset
+    virtual void resetZero() {};
     
 protected:
     int mMaxNu;
