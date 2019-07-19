@@ -1,5 +1,5 @@
 // SolidElement.h
-// created by Kuangdai on 29-Mar-2016 
+// created by Kuangdai on 29-Mar-2016
 // base class of solid element
 
 #pragma once
@@ -36,56 +36,54 @@ class SolidElement : public Element {
     friend class FluidElement;
     
 public:
-    
-    SolidElement(Gradient *grad, PRT *prt, const std::array<Point *, nPntElem> &points, 
+
+    SolidElement(Gradient *grad, PRT *prt, const std::array<Point *, nPntElem> &points,
         Elastic *elas);
     ~SolidElement();
-    
+
     // compute stiffness term
     void computeStiff() const;
-    
-    // measure cost 
+
+    // measure cost
     double measure(int count) const;
-    
-    // test stiffness 
+
+    // test stiffness
     void test() const;
-    
+
     // compute Real displacement, used by receiver
-    void computeGroundMotion(Real phi, const RMatPP &weights, RRow3 &u_spz) const; 
-    void computeStrain(Real phi, const RMatPP &weights, RRow6 &strain) const; 
-    void computeCurl(Real phi, const RMatPP &weights, RRow3 &curl) const; 
+    void computeGroundMotion(Real phi, const RMatPP &weights, RRow3 &u_spz) const;
+    void computeStrain(Real phi, const RMatPP &weights, RRow6 &strain) const;
+    void computeCurl(Real phi, const RMatPP &weights, RRow3 &curl) const;
     void forceTIso();
-    
+
     // side-wise
-    void feedDispOnSide(int side, CMatXX_RM &buffer, int row) const; 
-    
+    void feedDispOnSide(int side, CMatXX_RM &buffer, int row) const;
+
     // verbose
     std::string verbose() const;
     
-    bool fluid() const;
+    bool fluid() const {return false;};
 
     // reset
     void resetZero();
     
 private:
-    
+
     // displ ==> stiff
     void displToStiff() const;
-    
+
     // material
     Elastic *mElastic;
     CrdTransTIsoSolid *mCrdTransTIso;
     // flags
     bool mInTIso;
     bool mElem3D;
-    
-//-------------------------- static --------------------------//    
+
+//-------------------------- static --------------------------//
 public:
     // initialize static workspace
     static void initWorkspace(int maxMaxNu);
-    
+
 private:
     static SolidResponse sResponse;
 };
-
-

@@ -439,10 +439,8 @@ void SolidElement::displToStiff() const {
         }
         mGradient->computeQuad6(sResponse.mStiff, sResponse.mStress6, sResponse.mNu, sResponse.mNyquist);
     }
-    
-}
 
-bool SolidElement::fluid() const {return false;}
+}
 
 //-------------------------- static --------------------------//
 SolidResponse SolidElement::sResponse;

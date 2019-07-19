@@ -72,8 +72,8 @@ void Volumetric3D_s20rts::finalize() {
 bool Volumetric3D_s20rts::get3dProperties(double r, double theta, double phi, double rElemCenter,
     std::vector<MaterialProperty> &properties, 
     std::vector<MaterialRefType> &refTypes,
-    std::vector<double> &values) const {
-    
+    std::vector<double> &values, bool isFluid) const {
+
     // header
     properties.clear();
     properties.push_back(Volumetric3D::MaterialProperty::VP);

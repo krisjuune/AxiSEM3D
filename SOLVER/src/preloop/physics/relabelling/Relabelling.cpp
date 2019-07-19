@@ -29,24 +29,46 @@ mMyQuad(quad) {
     }
 }
 
-void Relabelling::addUndulation(const std::vector<Geometric3D *> &g3D, 
-    double srcLat, double srcLon, double srcDep, double phi2D) {
+void Relabelling::addUndulation(const std::vector<Geometric3D *> &g3D,
+    double srcLat, double srcLon, double srcDep, double phi2D,
+    const int ABPosition) {
     if (g3D.size() == 0) {
         return;
-    }    
-    double rElemCenter = mMyQuad->computeCenterRadius();
+    }
+
+    RDCol2 szCenter = mMyQuad->mapping(RDCol2::Zero());
     int Nr = mMyQuad->getNr();
     for (int ipol = 0; ipol <= nPol; ipol++) {
         for (int jpol = 0; jpol <= nPol; jpol++) {
+            
+            int ipol_ref = ipol;
+            int jpol_ref = jpol;
+            if (ABPosition == 1) { // right boundary
+                ipol_ref = nPol;
+            } else if (ABPosition == 2) { //lower boundary
+                jpol_ref = nPol;
+            } else if (ABPosition == 3) { //corner
+                ipol_ref = nPol;
+                jpol_ref = nPol;
+            }
+
             int ipnt = ipol * nPntEdge + jpol;
-            const RDCol2 &xieta = SpectralConstants::getXiEta(ipol, jpol, mMyQuad->isAxial());
-            const RDMatX3 &rtpS = mMyQuad->computeGeocentricGlobal(srcLat, srcLon, srcDep, xieta, Nr, phi2D);
-            for (int alpha = 0; alpha < Nr; alpha++) {
-                double r = rtpS(alpha, 0);
-                double t = rtpS(alpha, 1);
-                double p = rtpS(alpha, 2);
-                for (const auto &model: g3D) {
-                    mStiff_dZ(alpha, ipnt) += model->getDeltaR(r, t, p, rElemCenter); 
+            const RDCol2 &xieta = SpectralConstants::getXiEta(ipol_ref, jpol_ref, mMyQuad->isAxial());
+            for (const auto &model: g3D) {
+                RDMatX3 rtpS;
+                double rElemCenter;
+                if (model->isCartesian()) {
+                    rtpS = mMyQuad->computeCartesian(xieta, Nr, phi2D); // r s phi
+                    rElemCenter = szCenter(1);
+                } else {
+                    rtpS = mMyQuad->computeGeocentricGlobal(srcLat, srcLon, srcDep, xieta, Nr, phi2D);
+                    rElemCenter = szCenter.norm();
+                }
+                for (int alpha = 0; alpha < Nr; alpha++) {
+                    double r = rtpS(alpha, 0);
+                    double t = rtpS(alpha, 1);
+                    double p = rtpS(alpha, 2);
+                    mStiff_dZ(alpha, ipnt) += model->getDeltaR(r, t, p, rElemCenter);
                 }
             }
         }
@@ -150,6 +172,33 @@ RDMatX3 Relabelling::getSFNormalRTZ(int ipol, int jpol) const {
     normal.col(1) = -J2.schur(J0);
     normal.col(2) = J0.schur(J0);
     return normal;
+}
+
+RDColX Relabelling::getStaceyNormalWeight(int ipol, int jpol, int side) const {
+    int ipol0, ipol1, jpol0, jpol1;
+    if (side == 0 || side == 2) {
+        ipol0 = std::max({0, ipol-1});
+        ipol1 = std::min({ipol+1, nPol});
+        jpol0 = jpol;
+        jpol1 = jpol;
+    } else if (side == 1 || side == 3) {
+        ipol0 = ipol;
+        ipol1 = ipol;
+        jpol0 = std::max({0, jpol-1});
+        jpol1 = std::min({jpol+1, nPol});
+    }
+    
+    int ipnt0 = ipol0 * nPntEdge + jpol0;
+    RDCol2 xieta = SpectralConstants::getXiEta(ipol0, jpol0, mMyQuad->isAxial());
+    double Z0 = mMyQuad->mapping(xieta).norm();
+    
+    int ipnt1 = ipol1 * nPntEdge + jpol1;
+    xieta = SpectralConstants::getXiEta(ipol1, jpol1, mMyQuad->isAxial());
+    double Z1 = mMyQuad->mapping(xieta).norm();
+    
+    RDColX weight = ((Z1 + mMass_dZ[ipnt1].array()) - (Z0 + mMass_dZ[ipnt0].array())) / (Z1 - Z0);
+
+    return weight;
 }
 
 bool Relabelling::isZero() const {

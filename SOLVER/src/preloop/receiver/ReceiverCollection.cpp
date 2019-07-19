@@ -1,5 +1,5 @@
 // Receiver.cpp
-// created by Kuangdai on 1-Jun-2016 
+// created by Kuangdai on 1-Jun-2016
 // receiver collections
 
 #include "ReceiverCollection.h"
@@ -25,8 +25,8 @@
 
 ReceiverCollection::ReceiverCollection(const std::string &fileRec, bool geographic, 
     double srcLat, double srcLon, double srcDep, int duplicated, 
-    double saveSurfRadius, bool saveSurfUpper):
-mInputFile(fileRec), mGeographic(geographic), 
+    double saveSurfRadius, bool saveSurfUpper, bool cartesian):
+mInputFile(fileRec), mGeographic(geographic), mCartesian(cartesian), 
 mSrcLat(srcLat), mSrcLon(srcLon), mSrcDep(srcDep),
 mSaveSurfaceAtRadius(saveSurfRadius), mSaveSurfaceFromUpper(saveSurfUpper) {
     std::vector<std::string> name, network;
@@ -87,7 +87,7 @@ mSaveSurfaceAtRadius(saveSurfRadius), mSaveSurfaceFromUpper(saveSurfUpper) {
         XMPI::bcast(dumpStrain);
         XMPI::bcast(dumpCurl);
     }
-    
+
     // create receivers
     mWidthName = -1;
     mWidthNetwork = -1;
@@ -115,9 +115,9 @@ mSaveSurfaceAtRadius(saveSurfRadius), mSaveSurfaceFromUpper(saveSurfUpper) {
             recKeys.push_back(key);
         }
         // add receiver
-        mReceivers.push_back(new Receiver(name[i], network[i], 
-            theta[i], phi[i], geographic, depth[i], (bool)dumpStrain[i], (bool)dumpCurl[i], 
-            srcLat, srcLon, srcDep, kmconv));
+        mReceivers.push_back(new Receiver(name[i], network[i],
+            theta[i], phi[i], geographic, depth[i], (bool)dumpStrain[i], (bool)dumpCurl[i],
+            srcLat, srcLon, srcDep, mCartesian));
         mWidthName = std::max(mWidthName, (int)name[i].length());
         mWidthNetwork = std::max(mWidthNetwork, (int)network[i].length());
     }
@@ -137,13 +137,13 @@ void ReceiverCollection::release(Domain &domain, const Mesh &mesh, bool depthInR
     std::vector<int> recQTag(mReceivers.size(), -1);
     // std::vector<RDMatPP> recInterpFact(mReceivers.size(), RDMatPP::Zero());
     for (int irec = 0; irec < mReceivers.size(); irec++) {
-        bool found = mReceivers[irec]->locate(mesh, recETag[irec], recQTag[irec], depthInRef);
+        bool found = mReceivers[irec]->locate(mesh, recETag[irec], recQTag[irec], depthInRef, mCartesian);
         if (found) {
             recRank[irec] = XMPI::rank();
         }
     }
     MultilevelTimer::end("Locate Receivers", 2);
-    
+
     // release to domain
     MultilevelTimer::begin("Release to Domain", 2);
     PointwiseRecorder *recorderPW = new PointwiseRecorder(
@@ -159,7 +159,7 @@ void ReceiverCollection::release(Domain &domain, const Mesh &mesh, bool depthInR
     for (int irec = 0; irec < mReceivers.size(); irec++) {
         int recRankMin = recRankMinG[irec];
         if (recRankMin == XMPI::nproc()) {
-            throw std::runtime_error("ReceiverCollection::release || Error locating receiver || " 
+            throw std::runtime_error("ReceiverCollection::release || Error locating receiver || "
                 "Name = " + mReceivers[irec]->getName() + "; "
                 "Network = " + mReceivers[irec]->getNetwork());
         }
@@ -176,10 +176,10 @@ void ReceiverCollection::release(Domain &domain, const Mesh &mesh, bool depthInR
     for (const auto &io: mPointwiseIO) {
         recorderPW->addIO(io);
     }
-    
+
     // add recorder to domain
     domain.setPointwiseRecorder(recorderPW);
-    
+
     // whole surface
     if (mSaveSurfaceAtRadius > 0.) {
         MultilevelTimer::begin("Whole Surface", 3);
@@ -230,11 +230,11 @@ std::string ReceiverCollection::verbose() const {
 }
 
 void ReceiverCollection::buildInparam(ReceiverCollection *&rec, const Parameters &par,
-    double srcLat, double srcLon, double srcDep, int totalStepsSTF, bool kmconv, int verbose) {
+    double srcLat, double srcLon, double srcDep, int totalStepsSTF, bool cartesian, int verbose) {
     if (rec) {
         delete rec;
     }
-    
+
     // create from file
     std::string recFile = par.getValue<std::string>("OUT_STATIONS_FILE");
     std::string recSys = par.getValue<std::string>("OUT_STATIONS_SYSTEM");
@@ -276,10 +276,10 @@ void ReceiverCollection::buildInparam(ReceiverCollection *&rec, const Parameters
             upper = par.getValue<bool>("OUT_STATIONS_WHOLE_SURFACE", 2);
         }
         rec = new ReceiverCollection(recFile, geographic, srcLat, srcLon, srcDep, 
-            duplicated, r, upper); 
+            duplicated, r, upper, cartesian); 
     } else {
         rec = new ReceiverCollection(recFile, geographic, srcLat, srcLon, srcDep, 
-            duplicated, -1, false); 
+            duplicated, -1, false, cartesian); 
     }
     
     // options 
@@ -309,13 +309,13 @@ void ReceiverCollection::buildInparam(ReceiverCollection *&rec, const Parameters
         throw std::runtime_error("ReceiverCollection::buildInparam || "
             "Invalid parameter, keyword = OUT_STATIONS_COMPONENTS.");
     }
-    
+
     // IO
     int numFmt = par.getSize("OUT_STATIONS_FORMAT");
     // use bool first to avoid duplicated IO
-    bool ascii = false, netcdf = false, netcdf_no_assemble = false; 
+    bool ascii = false, netcdf = false, netcdf_no_assemble = false;
     for (int i = 0; i < numFmt; i++) {
-        std::string strfmt = par.getValue<std::string>("OUT_STATIONS_FORMAT", i); 
+        std::string strfmt = par.getValue<std::string>("OUT_STATIONS_FORMAT", i);
         if (boost::iequals(strfmt, "ascii")) {
             ascii = true;
         } else if (boost::iequals(strfmt, "netcdf")) {
@@ -353,9 +353,8 @@ void ReceiverCollection::buildInparam(ReceiverCollection *&rec, const Parameters
         rec->mPointwiseIO.push_back(new PointwiseIONetCDF(false));
         rec->mAssemble = false;
     }
-    
+
     if (verbose) {
         XMPI::cout << rec->verbose();
     }
 }
-

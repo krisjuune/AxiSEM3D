@@ -12,7 +12,7 @@ public:
     WisdomNrField(bool useLucky, const std::string &fname, double factor);
     ~WisdomNrField();
     
-    int getNrAtPoint(const RDCol2 &coords) const;
+    int getNrAtPointInternal(const RDCol2 &coords) const;
     
     std::string verbose() const;
     

@@ -5,9 +5,10 @@
 #include "FluidPoint.h"
 #include "Mass.h"
 #include "MultilevelTimer.h"
+#include "ABC.h"
 
-FluidPoint::FluidPoint(int nr, bool axial, const RDCol2 &crds, Mass *mass, bool fluidSurf):
-Point(nr, axial, crds), mMass(mass), mFluidSurf(fluidSurf) {
+FluidPoint::FluidPoint(int nr, bool axial, const RDCol2 &crds, Mass *mass, const bool fluidSurf, 
+    ABC *ABC): Point(nr, axial, crds), mMass(mass), mFluidSurf(fluidSurf), mABC(ABC) {
     mDispl = CColX::Zero(mNu + 1, 1);
     mVeloc = CColX::Zero(mNu + 1, 1);
     mAccel = CColX::Zero(mNu + 1, 1);
@@ -20,14 +21,17 @@ FluidPoint::~FluidPoint() {
     delete mMass;
 }
 
-void FluidPoint::updateNewmark(double dt) {
-    
-    if (mFluidSurf) {
-        resetZero();
-        return;
+void FluidPoint::updateNewmark(Real dt) {
+    // calculate new acceleration
+
+    if(mFluidSurf) {
+      resetZero();
+      return;
     }
     
-    // mask stiff 
+    if (mABC) mStiff -= mABC->StaceyTraction(mVeloc);
+    
+    // mask stiff
     maskField(mStiff);
       // compute accel inplace
     mMass->computeAccel(mStiff);
@@ -36,9 +40,16 @@ void FluidPoint::updateNewmark(double dt) {
     // update dt
     double half_dt = half * dt;
     double half_dt_dt = half_dt * dt;
+    
+    // damp acceleration in sponge boundary
+    if (mABC) mABC->applyKosloffDamping(mStiff, mVeloc, mDispl);
+    
+    // update velocity and old acceleration
     mVeloc += (Real)half_dt * (mAccel + mStiff);
     mAccel = mStiff;
-    mDispl += (Real)dt * mVeloc + (Real)half_dt_dt * mAccel;  
+    // update displacement
+    mDispl += (Real)dt * mVeloc + (Real)half_dt_dt * mAccel;
+
     // zero stiffness for next time step
     mStiff.setZero();
 }

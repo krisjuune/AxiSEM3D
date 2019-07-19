@@ -238,7 +238,7 @@ void Source::buildInparam(Source *&src, const Parameters &par, int verbose) {
           // point force
           std::string pressuresfile = Parameters::sInputDirectory + "/" + src_file;
           double depth = DBL_MAX, lat = DBL_MAX, lon = DBL_MAX;
-          double p0 = DBL_MAX, V = DBL_MAX, M0 = DBL_MAX;
+          double p0 = DBL_MAX;
           if (XMPI::root()) {
               std::fstream fs(pressuresfile, std::fstream::in);
               if (!fs) {
@@ -251,23 +251,20 @@ void Source::buildInparam(Source *&src, const Parameters &par, int verbose) {
                   parseLine(line, "longitude", lon);
                   parseLine(line, "depth", depth);
                   parseLine(line, "pressure", p0);
-                  parseLine(line, "injector_vol", V);
               }
               checkValue("latitude", lat);
               checkValue("longitude", lon);
               checkValue("depth", depth);
               checkValue("pressure", p0);
-              checkValue("injector_vol", V);
               // unit
-              M0 = 0.1 * p0 * V;
               depth *= 1e3;
               fs.close();
           }
           XMPI::bcast(depth);
           XMPI::bcast(lat);
           XMPI::bcast(lon);
-          XMPI::bcast(M0);
-          src = new PressureSource(depth, lat, lon, M0);
+          XMPI::bcast(p0);
+          src = new PressureSource(depth, lat, lon, p0);
     } else {
         throw std::runtime_error("Source::buildInparam || Unknown source type: " + src_type);
     }

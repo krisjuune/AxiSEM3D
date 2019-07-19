@@ -9,6 +9,7 @@
 
 class Parameters;
 class ExodusModel;
+class AutoGeometricParams;
 
 class Volumetric3D {
 public:
@@ -72,9 +73,9 @@ public:
     virtual bool get3dProperties(double r, double theta, double phi, double rElemCenter,
         std::vector<MaterialProperty> &properties, 
         std::vector<MaterialRefType> &refTypes,
-        std::vector<double> &values) const = 0;
-        
-    // verbose 
+        std::vector<double> &values, bool isFluid) const = 0;
+
+    // verbose
     virtual std::string verbose() const = 0;
     
     // set source location, if needed
@@ -84,12 +85,14 @@ public:
     virtual void setupExodusModel(const ExodusModel *exModel) {};
     
     // build from input parameters
-    static void buildInparam(std::vector<Volumetric3D *> &models, 
-        const Parameters &par, const ExodusModel *exModel, 
+    static void buildInparam(std::vector<Volumetric3D *> &models,
+        const Parameters &par, const ExodusModel *exModel,
+        std::vector<AutoGeometricParams *> &Vol2GeoModels,
         double srcLat, double srcLon, double srcDep, int verbose);
         
     // some models may extent into the fluid core
     // but may not create 3D fluid actually
     virtual bool makeFluid3D() const {return false;};    
+    virtual void modelBathymetry(std::vector<AutoGeometricParams *> &Vol2GeoModels) {};
 
 };

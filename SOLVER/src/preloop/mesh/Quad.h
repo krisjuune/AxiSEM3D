@@ -33,11 +33,13 @@ public:
     ~Quad();
     
     // 3D models
-    void addVolumetric3D(const std::vector<Volumetric3D *> &m3D, 
-        double srcLat, double srcLon, double srcDep, double phi2D);
-    void addGeometric3D(const std::vector<Geometric3D *> &g3D, 
-        double srcLat, double srcLon, double srcDep, double phi2D);
-    void setOceanLoad3D(const OceanLoad3D &o3D, 
+    void addVolumetric3D(const std::vector<Volumetric3D *> &m3D,
+        double srcLat, double srcLon, double srcDep, double phi2D,
+        const int ABPosition);
+    void addGeometric3D(const std::vector<Geometric3D *> &g3D,
+        double srcLat, double srcLon, double srcDep, double phi2D,
+        const int ABPosition);
+    void setOceanLoad3D(const OceanLoad3D &o3D,
         double srcLat, double srcLon, double srcDep, double phi2D);
     
     // has relabelling or not
@@ -49,17 +51,18 @@ public:
     // setup gll points 
     
     void setupGLLPoints(std::vector<GLLPoint *> &gllPoints, const IMatPP &myPointTags,
-        double distTol, RDCol2 &Vref_range, RDCol2 &U0_range, const ABCParameters *ABCPar);
+        double distTol, bool isCartesian, RDCol2 &Vref_range, RDCol2 &U0_range, const ABCParameters *ABCPar);
 
     // create elements and push to domain
-    int release(Domain &domain, const IMatPP &myPointTags, 
-        const AttBuilder *attBuild) const;
-    int releaseSolid(Domain &domain, const IMatPP &myPointTags, 
-        const AttBuilder *attBuild) const;
-    int releaseFluid(Domain &domain, const IMatPP &myPointTags) const;
-    
+    int release(Domain &domain, const IMatPP &myPointTags,
+        const AttBuilder *attBuild, bool recordingWF) const;
+    int releaseSolid(Domain &domain, const IMatPP &myPointTags,
+        const AttBuilder *attBuild, bool recordingWF) const;
+    int releaseFluid(Domain &domain, const IMatPP &myPointTags, bool recordingWF) const;
+
     // mapping interfaces
     RDCol2 mapping(const RDCol2 &xieta) const;
+    RDCol2 mapping(const RDCol2 &xieta, const RDMat24 nodalcoords) const;
     RDMat22 jacobian(const RDCol2 &xieta) const;
     double detJacobian(const RDCol2 &xieta) const;
     bool invMapping(const RDCol2 &sz, RDCol2 &xieta) const;
@@ -70,6 +73,7 @@ public:
     // compute geographic coordinates
     RDMatX3 computeGeocentricGlobal(double srcLat, double srcLon, double srcDep,
         const RDCol2 &xieta, int npnt, double phi2D) const;
+    RDMatX3 computeCartesian(const RDCol2 &xieta, int npnt, double phi2D) const;
     double computeCenterRadius() const;
     
     // get properties
@@ -105,6 +109,11 @@ public:
     
     int edgeAtRadius(double radius, double distTol, bool upper) const;
         
+    // for time-slice recording
+    void getWFRweights(RDMatPP &WF_interpfact) const;
+    
+    bool mIsAxial, mOnSFBoundary, mOnSurface, mOnAbsBoundary, mIsExtQuad, mIsSpongeQuad;
+
 protected:
         
     // create graident operator
@@ -120,8 +129,9 @@ protected:
     double getCourant() const;
     
     // compute normal
-    RDMatX3 computeNormal(int side, int ipol, int jpol) const;
-    
+    RDMatX3 computeNormal(int side, int ipol, int jpol, bool isCartesian) const;
+    void computeNormalGeneral(RDMatX3 &normal, int side, int ipol, int jpol, bool isCartesian) const;
+
     ////////////////////////////////////////////////// Nodal level
     // quad tag in Exodus
     int mQuadTag;
@@ -131,18 +141,19 @@ protected:
     
     // nodal coordinates and tags
     RDMat24 mNodalCoords;
+    RDMat24 mCopyCoords;
     IRow4 mGlobalNodeTags;
     
     // geometric mapping
     Mapping *mMapping;
-    int mCurvedOuter;
-    
+    int mCurvedOuter, mCartOuter;
+
     // solid or fluid
     bool mIsFluid;
     
     // axial, sf, surface boundaries, absorbing boundaries
-    bool mIsAxial, mOnSFBoundary, mOnSurface;
-    int mAxialSide, mSFSide, mSurfaceSide, mIsABQuad;
+    
+    int mAxialSide, mSFSide, mSurfaceSide, mABCRightSide, mABCLowerSide;
     double mVref;
 
     ////////////////////////////////////////////////// GLL level

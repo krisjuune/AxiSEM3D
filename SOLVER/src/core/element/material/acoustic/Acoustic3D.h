@@ -10,8 +10,8 @@
 class Acoustic3D: public Acoustic {
 public:
     // constructor
-    Acoustic3D(const RMatXN &KFluid): mKFlat(KFluid) {};
-    
+    Acoustic3D(const RMatXN &KFluid, const RMatXN Rho): mKFlat(KFluid), mRho(Rho) {};
+
     // STEP 2: strain ==> stress
     void strainToStress(FluidResponse &response) const;
     
@@ -24,8 +24,9 @@ public:
     // check compatibility
     void checkCompatibility(int Nr) const;
 
-    RMatXN getK3D() const {return mKFlat;}
+    RMatXN getRho() const {return mRho;};
 
 private:
     RMatXN mKFlat;
+    RMatXN mRho;
 };

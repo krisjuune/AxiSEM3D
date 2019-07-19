@@ -1,3 +1,3 @@
 __pycache__
-axisem3d_depends
-SOLVER/src/3d_model/3d_volumetric/SEG/C3NA_data
+/axisem3d_depends/**
+/SOLVER/src/3d_model/3d_volumetric/SEG/C3NA_data

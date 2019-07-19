@@ -16,7 +16,8 @@ public:
     void initialize(const std::vector<std::string> &params);
     double getDeltaR(double r, double theta, double phi, double rElemCenter) const;
     std::string verbose() const;
-    
+
+    bool isCartesian() {return false;};
 private:
     
     // model constants

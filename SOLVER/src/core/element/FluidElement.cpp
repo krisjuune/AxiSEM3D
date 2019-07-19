@@ -337,8 +337,6 @@ void FluidElement::displToStiff() const {
     mGradient->computeQuad(sResponse.mStiff, sResponse.mStress, sResponse.mNu, sResponse.mNyquist);
 }
 
-bool FluidElement::fluid() const {return true;}
-
 //-------------------------- static --------------------------//
 FluidResponse FluidElement::sResponse;
 void FluidElement::initWorkspace(int maxMaxNu) {

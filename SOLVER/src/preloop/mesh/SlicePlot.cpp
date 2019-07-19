@@ -114,6 +114,7 @@ void SlicePlot::plotPhysicalProperties() const {
     
     // data size
     int ncol = 1;
+    if (mSampleType == SampleTypes::Center) ncol = 3;
     if (mSampleType == SampleTypes::Vertex) ncol = 4;
     if (mSampleType == SampleTypes::GLLPnt) ncol = nPntElem;
     int nrow = mMesh->mExModel->getNumQuads();
@@ -129,7 +130,11 @@ void SlicePlot::plotPhysicalProperties() const {
         }
         int row = mMesh->mQuads[i]->getQuadTag();
         if (mSampleType == SampleTypes::Center) {
-            data(row, 0) = quadData(nPol / 2 * nPntEdge + nPol / 2);
+             double s_min, s_max, z_min, z_max;
+             mMesh->mQuads[i]->getSpatialRange(s_min, s_max, z_min, z_max);
+             data(row, 0) = 0.5 * (s_min + s_max);
+             data(row, 1) = 0.5 * (z_min + z_max);
+             data(row, 2) = quadData(nPol / 2 * nPntEdge + nPol / 2);
         } else if (mSampleType == SampleTypes::Vertex) {
             data(row, 0) = quadData(0);
             data(row, 1) = quadData(nPol * nPntEdge);

@@ -16,9 +16,10 @@ public:
     Relabelling(const Quad *quad);
     
     // add deltaR on mass sampling points
-    void addUndulation(const std::vector<Geometric3D *> &g3D, 
-        double srcLat, double srcLon, double srcDep, double phi2D);
-    
+    void addUndulation(const std::vector<Geometric3D *> &g3D,
+        double srcLat, double srcLon, double srcDep, double phi2D,
+        const int ABPosition);
+
     // stiffness
     RDMatXN getStiffJacobian() const;
     RDMatXN4 getStiffX() const;
@@ -28,6 +29,9 @@ public:
     
     // solid-fluid
     RDMatX3 getSFNormalRTZ(int ipol, int jpol) const;
+    
+    // stacey ABCs
+    RDColX getStaceyNormalWeight(int ipol, int jpol, int side) const;
     
     // is undulation zero
     bool isZero() const;

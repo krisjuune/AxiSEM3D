@@ -5,13 +5,14 @@
 #pragma once
 
 class Mass;
+class ABC;
 #include "Point.h"
 
 class SolidPoint: public Point {
     friend class SolidFluidPoint;
     
 public:
-    SolidPoint(int nr, bool axial, const RDCol2 &crds, Mass *mass, const double gamma);
+    SolidPoint(int nr, bool axial, const RDCol2 &crds, Mass *mass, ABC *ABC);
     ~SolidPoint();
     
     // update in time domain by Newmark
@@ -75,7 +76,7 @@ private:
     Mass *mMass;
     
     // ABC factor
-    double mGamma;
+    ABC *mABC = 0;
 
     // max disp norm for wisddom learning
     RRow3 mMaxDisplWisdom = -RRow3::Ones();

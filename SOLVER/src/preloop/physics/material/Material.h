@@ -21,9 +21,10 @@ public:
     Material(const Quad *myQuad, const ExodusModel &exModel);
     
     // add 3D
-    void addVolumetric3D(const std::vector<Volumetric3D *> &m3D, 
-        double srcLat, double srcLon, double srcDep, double phi2D);
-        
+    void addVolumetric3D(const std::vector<Volumetric3D *> &m3D,
+        double srcLat, double srcLon, double srcDep, double phi2D,
+        const int ABPosition);
+
     // Mass
     arPP_RDColX computeElementalMass() const;
     
@@ -47,7 +48,7 @@ public:
     
     // get properties
     RDMatXN getProperty(const std::string &vname, int refType);
-        
+
     //////////// anisotropy /////////////
 private:    
     void initAniso();

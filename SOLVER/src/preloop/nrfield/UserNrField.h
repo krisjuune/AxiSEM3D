@@ -11,7 +11,7 @@ class UserNrField: public NrField {
 public:
     UserNrField(bool useLucky, const std::vector<double> &params);
     
-    int getNrAtPoint(const RDCol2 &coords) const;
+    int getNrAtPointInternal(const RDCol2 &coords) const;
     
     std::string verbose() const;
     

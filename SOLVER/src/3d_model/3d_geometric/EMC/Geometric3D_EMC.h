@@ -12,7 +12,9 @@ public:
 
     void initialize();
     void initialize(const std::vector<std::string> &params);
+    void initializeOcean(double rLayer, double rUpper, double rLower, RDColX lat, RDColX lon, RDMatXX bathymetry);
     double getDeltaR(double r, double theta, double phi, double rElemCenter) const;
+    bool isCartesian() const {return mCartesian;};
     std::string verbose() const;
     
 private:
@@ -31,10 +33,12 @@ private:
     
     // use geocentric or geographic
     bool mGeographic = false;
-    
+    bool mCartesian = false;
+
     // data
     RDMatXX mGridData;
     RDColX mGridLat;
     RDColX mGridLon;
-};
 
+    std::string mVerboseOcean = "";
+};

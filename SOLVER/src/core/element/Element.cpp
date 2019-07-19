@@ -7,9 +7,10 @@
 #include "Acoustic.h"
 
 #include "FieldFFT.h"
-#include "SolverFFTW_N.h"
+#include "SolverFFTW_N3.h"
 #include "Gradient.h"
 #include "PRT.h"
+#include "XMath.h"
 
 Element::Element(Gradient *grad, PRT *prt, const std::array<Point *, nPntElem> &points):
 mGradient(grad), mPRT(prt), mHasPRT(prt != 0) {
@@ -34,32 +35,38 @@ Element::~Element() {
 void Element::addSourceTerm(const arPP_CMatX3 &source) const {
     arPP_CMatX3 SF_source = source;
     if (fluid()) {
-        Acoustic *acoust = getAcoustic();
-        if (acoust->is1D()) {
-            RMatPP K = acoust->getK1D();
-            for (int ipol = 0; ipol <= nPol; ipol++) {
-                for (int jpol = 0; jpol <= nPol; jpol++) {
-                    int ipnt = ipol * nPntEdge + jpol;
-                    std::complex<double> Kc = {K(ipol,jpol),0};
+        const Acoustic *acoust = getAcoustic();
+        RMatXN K = acoust->getRho();
+
+        vec_ar3_CMatPP source_F = vec_ar3_CMatPP(mMaxNu + 1, zero_ar3_CMatPP);
+        for (int ipol = 0; ipol <= nPol; ipol++) {
+            for (int jpol = 0; jpol <= nPol; jpol++) {
+                int ipnt = ipol * nPntEdge + jpol;
+                for (int alpha = 0; alpha < SF_source[ipnt].rows(); alpha++) {
                     for (int i = 0; i < 3; i++) {
-                        for (int alpha = 0; alpha < SF_source[ipnt].rows(); alpha++) {
-                            SF_source[ipnt](alpha, i) = SF_source[ipnt](alpha, i) * Kc;
-                        }
+                        source_F[alpha][i](ipol, jpol) = SF_source[ipnt](alpha, i);
                     }
                 }
             }
-        } else {
-            RMatXN &K = SolverFFTW_N::getR2C_RMat(mMaxNr);
-            vec_CMatPP KF;
-            K = acoust->getK3D();
-            FieldFFT::transformP2F(KF, mMaxNr);
+        }
+
+        RMatXN3 &source_P = SolverFFTW_N3::getR2C_RMat();
+        FieldFFT::transformF2P(source_F, mMaxNr);
+        source_P = SolverFFTW_N3::getC2R_RMat().topRows(mMaxNr);
+        for (int alpha = 0; alpha <= mMaxNu; alpha++) {
+            for (int i = 0; i < 3; i++) {
+                for (int ipnt = 0; ipnt < nPE; ipnt++) {
+                    source_P(alpha, i * nPE + ipnt) *= K(alpha, ipnt);
+                }
+            }
+        }
+        FieldFFT::transformP2F(source_F, mMaxNr);
+        for (int i = 0; i < 3; i++) {
             for (int ipol = 0; ipol <= nPol; ipol++) {
                 for (int jpol = 0; jpol <= nPol; jpol++) {
                     int ipnt = ipol * nPntEdge + jpol;
-                    for (int i = 0; i < 3; i++) {
-                        for (int alpha = 0; alpha < SF_source[ipnt].rows(); alpha++) {
-                            SF_source[ipnt](alpha, i) = SF_source[ipnt](alpha, i) * KF[alpha](ipol,jpol);
-                        }
+                    for (int alpha = 0; alpha < SF_source[ipnt].rows(); alpha++) {
+                        SF_source[ipnt](alpha, i) = source_F[alpha][i](ipol, jpol);
                     }
                 }
             }
@@ -67,7 +74,6 @@ void Element::addSourceTerm(const arPP_CMatX3 &source) const {
     }
     for (int i = 0; i < nPntElem; i++) {
         mPoints[i]->addToStiff(SF_source[i]);
-        mPoints[i]->setSourceMedium(fluid());
     }
 }
 
@@ -125,3 +131,15 @@ RDMatXX Element::getCoordsOnSide(int side) const {
     return sz;
 }
 
+RRow3 Element::recordWF(const double phi) const {
+    RRow3 u_spz;
+    computeGroundMotion(phi, mWFRweights, u_spz);
+    return u_spz;
+}
+
+RDCol2 Element::getCenterCrds(const double phi) const {
+    RDCol2 crds;
+    RDRowN dz = XMath::computeFourierAtPhi(mDz, phi);
+    crds << mCenterCrds(0), mCenterCrds(1) + dz(round((nPE-1)/2));
+    return crds;
+}

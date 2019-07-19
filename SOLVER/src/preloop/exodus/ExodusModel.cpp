@@ -1,8 +1,8 @@
 // ExodusModel.cpp
-// created by Kuangdai on 2-May-2016 
+// created by Kuangdai on 2-May-2016
 // read Exodus mesh file
 
-// Adapted from salvus project 
+// Adapted from salvus project
 // ExodusModel.cpp by Michael Afanasiev
 
 
@@ -39,11 +39,11 @@ void ExodusModel::initialize() {
         readRawData();
     }
     MultilevelTimer::end("Read Exodus", 1);
-    
+
     MultilevelTimer::begin("Bcast Exodus", 1);
     bcastRawData();
     MultilevelTimer::end("Bcast Exodus", 1);
-    
+
     MultilevelTimer::begin("Process Exodus", 1);
     formStructured();
     formAuxiliary();
@@ -55,12 +55,12 @@ void ExodusModel::readRawData() {
     NetCDF_Reader reader;
     reader.open(mExodusFileName);
     RDMatXX dbuffer;
-    
+
     // global
     reader.readString("name_glo_var", mGlobalVariableNames);
     reader.read1D("vals_glo_var", mGlobalVariableValues);
     reader.readString("info_records", mGlobalRecordsRaw);
-    
+
     // connectivity and coords
     reader.read2D("connect1", mConnectivity);
     mConnectivity.array() -= 1;
@@ -69,6 +69,8 @@ void ExodusModel::readRawData() {
     
     // distance tolerance
     mDistTolerance = DBL_MAX;
+    mHmax = 0;
+    mHmin = 6371000;
     for (int i = 0; i < getNumQuads(); i++) {
         double s0 = mNodalS(mConnectivity(i, 0));
         double z0 = mNodalZ(mConnectivity(i, 0));
@@ -83,7 +85,11 @@ void ExodusModel::readRawData() {
         double dist2 = sqrt((s2 - s3) * (s2 - s3) + (z2 - z3) * (z2 - z3)) / 1000.;
         double dist3 = sqrt((s3 - s0) * (s3 - s0) + (z3 - z0) * (z3 - z0)) / 1000.;
         mDistTolerance = std::min({dist0, dist1, dist2, dist3, mDistTolerance});
+        mHmax = std::max({dist0, dist1, dist2, dist3, mHmax});
+        mHmin = std::min({dist0, dist1, dist2, dist3, mHmin});
     }
+    mHmax = 1000 * mHmax;
+    mHmin = 1000 * mHmin;
     
     // side sets
     reader.readString("ss_names", mSideSetNames);
@@ -109,7 +115,7 @@ void ExodusModel::readRawData() {
     bool cartesian = false;
     for (int i = 0; i < mGlobalRecordsRaw.size(); i++) {
         std::vector<std::string> substrs = Parameters::splitString(mGlobalRecordsRaw[i], "=");
-        if (boost::iequals(boost::trim_copy(substrs[0]), "crdsys") && 
+        if (boost::iequals(boost::trim_copy(substrs[0]), "crdsys") &&
             boost::iequals(boost::trim_copy(substrs[1]), "cartesian")) {
             cartesian = true;
             break;
@@ -118,7 +124,7 @@ void ExodusModel::readRawData() {
     if (cartesian) {
         mEllipKnots = RDColX::Zero(0);
         mEllipCoeffs = RDColX::Zero(0);
-        // set radius to PREM 
+        // set radius to PREM
         mGlobalVariables.insert(std::pair<std::string, double>("radius", 6371e3));
     } else {
         // ellipticity
@@ -247,22 +253,11 @@ void ExodusModel::readRawData() {
 }
 
 void ExodusModel::bcastRawData() {
-    // 
-    // XMPI::cout << XMath::eigenMemoryInfo("mGlobalVariableValues", mGlobalVariableValues) << XMPI::endl;
-    // XMPI::cout << XMath::eigenMemoryInfo("mConnectivity", mConnectivity) << XMPI::endl;
-    // XMPI::cout << XMath::eigenMemoryInfo("mNodalS", mNodalS) << XMPI::endl;
-    // XMPI::cout << XMath::eigenMemoryInfo("mNodalZ", mNodalZ) << XMPI::endl;
-    // XMPI::cout << XMath::eigenMemoryInfo("mElementalVariableValues_elem", mElementalVariableValues_elem) << XMPI::endl;
-    // XMPI::cout << XMath::eigenMemoryInfo("mElementalVariableValues_axis", mElementalVariableValues_axis) << XMPI::endl;
-    // XMPI::cout << XMath::eigenMemoryInfo("mElementalVariableCoords_axis", mElementalVariableCoords_axis) << XMPI::endl;
-    // XMPI::cout << XMath::eigenMemoryInfo("mSideSetValues", mSideSetValues) << XMPI::endl;
-    // XMPI::cout << XMath::eigenMemoryInfo("mEllipKnots", mEllipKnots) << XMPI::endl;
-    // XMPI::cout << XMath::eigenMemoryInfo("mEllipCoeffs", mEllipCoeffs) << XMPI::endl;
-    // 
+
     XMPI::bcast(mGlobalVariableNames);
     XMPI::bcastEigen(mGlobalVariableValues);
     XMPI::bcast(mGlobalRecordsRaw);
-    
+
     XMPI::bcastEigen(mConnectivity);
     XMPI::bcastEigen(mNodalS);
     XMPI::bcastEigen(mNodalZ);
@@ -277,7 +272,7 @@ void ExodusModel::bcastRawData() {
     
     XMPI::bcast(mSideSetNames);
     XMPI::bcastEigen(mSideSetValues);
-    
+
     XMPI::bcastEigen(mEllipKnots);
     XMPI::bcastEigen(mEllipCoeffs);
 }
@@ -291,7 +286,7 @@ void ExodusModel::formStructured() {
         }
         mGlobalVariables.insert(std::pair<std::string, double>(varName, mGlobalVariableValues(i)));
     }
-    
+
     // global records
     std::vector<std::string> included = {"crdsys", "model"};
     for (int i = 0; i < mGlobalRecordsRaw.size(); i++) {
@@ -301,7 +296,7 @@ void ExodusModel::formStructured() {
                 boost::trim_copy(substrs[0]), boost::trim_copy(substrs[1])));
         }
     }
-    
+
     // elemental variables
     for (int i = 0; i < mElementalVariableNames_axis.size(); i++) {
         mElementalVariables_axis.insert(std::pair<std::string, RDColX>(mElementalVariableNames_axis[i], 
@@ -311,13 +306,13 @@ void ExodusModel::formStructured() {
         mElementalVariables_elem.insert(std::pair<std::string, RDColX>(mElementalVariableNames_elem[i], 
             mElementalVariableValues_elem.col(i)));
     }
-    
+
     // side sets
     for (int i = 0; i < mSideSetNames.size(); i++) {
-        mSideSets.insert(std::pair<std::string, IColX>(mSideSetNames[i], 
+        mSideSets.insert(std::pair<std::string, IColX>(mSideSetNames[i],
             mSideSetValues.col(i)));
     }
-    
+
     // name of axis and surface sets
     std::string sphere_axis_name = "t0";
     if (!isCartesian()) {
@@ -332,17 +327,52 @@ void ExodusModel::formStructured() {
     mSSNameLowerB = isCartesian() ? "y0" : "r0";
 
     // NOTE: we temporarily treat Cartesian meshes as special cases of spherical meshes
-    //       by means of moving it to the "north pole". The introduced global 
+    //       by means of moving it to the "north pole". The introduced global
     //       curvature should be ignorable, or the problem itself is ill-defined
     //       as a local problem.
     if (isCartesian()) {
         double R_EARTH = getROuter();
         double maxz = mNodalZ.maxCoeff();
-        mNodalZ.array() += R_EARTH - maxz; 
+        mNodalZ.array() += R_EARTH - maxz;
     }
 }
 
 void ExodusModel::formAuxiliary() {
+
+
+    // rotate nodes of axial elements such that side 3 is on axis, side 1 is the right boundary and side 0 is the lower boundary
+    MultilevelTimer::begin("Process Exodus Axis", 2);
+    for (int axialQuad = 0; axialQuad < getNumQuads(); axialQuad++) {
+
+        int shift=0;
+        int axialSide = getSideAxis(axialQuad);
+        if (axialSide != 3 & axialSide != -1) {shift = axialSide - 3;}
+        if (shift==0) {
+            continue;
+        }
+        
+        // side sets
+        for (auto it = mSideSets.begin(); it != mSideSets.end(); it++) {
+            if (it->second(axialQuad) != -1) {
+                it->second(axialQuad) = Mapping::period0123(it->second(axialQuad) - shift);
+            }
+        }
+    }
+    MultilevelTimer::end("Process Exodus Axis", 2);
+
+    MultilevelTimer::begin("Process Absorbing Boundaries", 2);
+    // extending mesh to incorporate absorbing boundaries
+    mABfield = IMatX2::Constant(getNumQuads(), 2,-1);
+    mNumQuadsInner = getNumQuads();
+    mNumNodesInner = getNumNodes();
+    mInnerBoundaries = getBoundaries();
+
+    if (mHasExtension) {
+        mN_ABC = ceil(round(10000 * mABCwidth / mHmax) / 10);
+        AddAbsorbingBoundaryElements();
+    }
+    MultilevelTimer::end("Process Absorbing Boundaries", 2);
+
     // average gll spacing
     MultilevelTimer::begin("Process Exodus GLL-Spacing", 2);
     std::vector<std::vector<int>> refElem(getNumNodes(), std::vector<int>());
@@ -373,7 +403,7 @@ void ExodusModel::formAuxiliary() {
             double dist3 = sqrt((s3 - s0) * (s3 - s0) + (z3 - z0) * (z3 - z0));
             mAveGLLSpacing(i) += (dist0 + dist1 + dist2 + dist3) / 4. / nPol / refElem[i].size();
         }
-    } 
+    }
     XMPI::sumEigenDouble(mAveGLLSpacing);
     MultilevelTimer::end("Process Exodus GLL-Spacing", 2);
 
@@ -381,21 +411,32 @@ void ExodusModel::formAuxiliary() {
     MultilevelTimer::begin("Process Exodus Solid-Fluid Boundary", 2);
     // find nodes which are part of both solid and fluid quads
     std::vector<bool> SFNode;
+    std::vector<double> SFdepth;
     for (int i = 0; i < getNumNodes(); i++) {
         int SumFluid = 0;
         for (int j = 0; j < refElem[i].size(); j++) {
             SumFluid += getElementalVariables("fluid",refElem[i][j]);
         }
         
-        // side sets
-        for (auto it = mSideSets.begin(); it != mSideSets.end(); it++) {
-            if (it->second(axialQuad) != -1) {
-                it->second(axialQuad) = Mapping::period0123(it->second(axialQuad) - axialSide + 3);
-            } 
-        } 
-        
-        // done
-        // mSideSets.at(mSSNameAxis)(axialQuad) = 3;
+        SFNode.push_back(0 < SumFluid && SumFluid < refElem[i].size());
+        if (SFNode[i]) {
+            SFdepth.push_back(mNodalZ(i));
+        }
+    }
+    // find highest SF boundary (assumed to be oceanfloor if surface quads are fluid)
+    SFdepth.push_back(mMeshedOceanDepth);
+    mMeshedOceanDepth = *std::max_element(SFdepth.begin(), SFdepth.end());
+
+    // identify side of quads which is on SF boundary
+    IColX SideSets_SF(getNumQuads());
+    for (int iQuad = 0; iQuad < getNumQuads(); iQuad++) {
+        SideSets_SF(iQuad) = -1;
+        for (int node0 = 0; node0 < 4; node0++) {
+            int node1 = node0 + 1 < 4 ? node0 + 1 : 0;
+            if (SFNode[mConnectivity(iQuad, node0)] && SFNode[mConnectivity(iQuad, node1)]) {
+                SideSets_SF(iQuad) = node0;
+            }
+        }
     }
     mSideSets.insert(std::pair<std::string, IColX>("solid_fluid_boundary", SideSets_SF));
     MultilevelTimer::end("Process Exodus Solid-Fluid Boundary", 2);
@@ -429,217 +470,133 @@ void ExodusModel::formAuxiliary() {
 }
 
 void ExodusModel::AddAbsorbingBoundaryElements() {
+    for (int i = 0; i < mElementalVariableNames_axis.size(); i++) {
+        std::string vname = mElementalVariableNames_axis[i];
+        if (vname.substr(0, 2) == "VP") {
+            mABC_Vmax = std::max(mABC_Vmax, mElementalVariableValues_axis.col(i).maxCoeff());
+        }
+    }
+    for (int i = 0; i < mElementalVariableNames_elem.size(); i++) {
+        std::string vname = mElementalVariableNames_elem[i];
+        if (vname.substr(0, 2) == "VP") {
+            mABC_Vmax = std::max(mABC_Vmax, mElementalVariableValues_elem.col(i).maxCoeff());
+        }
+    }
+    
+    if (mN_ABC <= 0) {mN_ABC = round(6 * mTSource * mABC_Vmax / mHmax);}
 
-    int node0, node1, node2, node3;
-    int Side, nNewNodes_right = 0, nNewNodes_bottom = 0;
-    int iABCcopy = 0;
-    bool set1, set2;
-    RDCol2 node0coords, node1coords, node2coords, node3coords;
-    std::vector<RDCol2> NewNodeCoords_right, NewNodeCoords_bottom;
-    IRow4 newABCelem;
-    std::vector<double> mapABCtoGlobal;
-
+    // right boundary
     int nQuads = getNumQuads();
-    int nQuads_ini = nQuads;
-    int nNodes = getNumNodes();
+    int nNodes = getNumNodes();;
 
-    // for verbose output to distinguish between inner mesh and boundaries
-    mNumQuadsInner = nQuads_ini;
-    mNumNodesInner = nNodes;
+    std::vector<int> rightBQuadTags;
+    for (int tag = 0; tag < nQuads; tag++) {
+        if (getSideRightB(tag) >= 0) {
+            rightBQuadTags.push_back(tag);
+        }
+    }
+    int ExtNr = rightBQuadTags.size() * mN_ABC;
+    mNodalS.conservativeResize(nNodes + ExtNr + mN_ABC, 1);
+    mNodalZ.conservativeResize(nNodes + ExtNr + mN_ABC, 1);
+    mConnectivity.conservativeResize(nQuads + ExtNr, 4);
+    mABfield.conservativeResize(nQuads + ExtNr, 2);
+    for (auto it = mSideSets.begin(); it != mSideSets.end(); it++) {
+        it->second.conservativeResize(nQuads + ExtNr, 1);
+        it->second.segment(nQuads, ExtNr) = IColX::Constant(ExtNr, 1, -1);
+    }
+    for (auto it = mElementalVariables_elem.begin(); it != mElementalVariables_elem.end(); it++) {
+        it->second.conservativeResize(nQuads + ExtNr, 1);
+    }
 
-    // add N_ABC boundary elements to the right of each quad at x1
-    for (int rightB_Quad = 0; rightB_Quad < nQuads_ini; rightB_Quad++) {
+    int BottomRightNode = mConnectivity(rightBQuadTags[0], getSideRightB(rightBQuadTags[0]));
+    mNodalS.segment(nNodes, mN_ABC) = RDColX::LinSpaced(mN_ABC, mNodalS(BottomRightNode) + mHmax, mNodalS(BottomRightNode) + mN_ABC * mHmax);
+    mNodalZ.segment(nNodes, mN_ABC) = RDColX::Constant(mN_ABC, 1, mNodalZ(BottomRightNode));
 
-        if (getSideRightB(rightB_Quad) == 1) {
-            mSideSets.at(mSSNameRightB)(rightB_Quad) = -1; // after adding new elements selected quad is no longer at the edge of the mesh
-
-            mABfield[rightB_Quad] = {0,++iABCcopy};
-
-            // find nodes at boundary of inner mesh
-            node0 = mConnectivity(rightB_Quad,1);
-            node3 = mConnectivity(rightB_Quad,2);
-
-            // specified number of boundary elements added to the right side of the selected quad
-            for (int n = 1; n <= mN_ABC; n++) {
-                set1 = 0;
-                set2 = 0;
-
-                // coordinates for outer nodes of the new quad
-                node1coords[0] = mNodalS(node0) + mHmax;
-                node1coords[1] = mNodalZ(node0);
-                node2coords[0] = mNodalS(node3) + mHmax;
-                node2coords[1] = mNodalZ(node3);
-
-                // check if outer nodes had been added previously
-                for (int i = 0; i < nNewNodes_right; i++) {
-                    if (NewNodeCoords_right[i] == node1coords) {
-                        node1 = mapABCtoGlobal[i];
-                        set1 = 1;
-                    }
-                    if (NewNodeCoords_right[i] == node2coords) {
-                        node2 = mapABCtoGlobal[i];
-                        set2 = 1;
-                    }
-                }
-
-                // adding new nodes if required
-                if (!set1) {
-                    node1 = nNodes;
-                    NewNodeCoords_right.push_back(node1coords);
-                    mapABCtoGlobal.push_back(nNodes);
-                    mNodalS.conservativeResize(nNodes + 1, 1);
-                    mNodalS[nNodes] = node1coords[0];
-                    mNodalZ.conservativeResize(nNodes + 1, 1);
-                    mNodalZ[nNodes] = node1coords[1];
-                    nNodes++;
-                    nNewNodes_right++;
-                }
-                if (!set2) {
-                    node2 = nNodes;
-                    NewNodeCoords_right.push_back(node2coords);
-                    mapABCtoGlobal.push_back(nNodes);
-                    mNodalS.conservativeResize(nNodes + 1, 1);
-                    mNodalS[nNodes] = node2coords[0];
-                    mNodalZ.conservativeResize(nNodes + 1, 1);
-                    mNodalZ[nNodes] = node2coords[1];
-                    nNodes++;
-                    nNewNodes_right++;
-                }
-
-                // add new quad to connectivity map
-                newABCelem = {node0, node1, node2, node3};
-                mConnectivity.conservativeResize(nQuads + 1, 4);
-                mConnectivity.row(nQuads) = newABCelem;
-
-                // update list of elemental variables and side sets (copies from nearest quad in inner mesh)
-                for (int i = 0; i < mElementalVariableNames.size(); i++) {
-                    std::string vname = mElementalVariableNames[i];
-                    RDColX temp = mElementalVariables.at(vname);
-                    temp.conservativeResize(nQuads + 1,1);
-                    // handling gradients near the boundary -> only constant values from nodes at edge are passed on
-                    if (vname.substr(vname.length() - 2, 2) == std::string("_0")) {
-                        temp(nQuads) = mElementalVariables.at(vname.substr(0, vname.length() - 2) + "_1")(rightB_Quad);
-                    } else if (vname.substr(vname.length() - 2, 2) == std::string("_3")) {
-                        temp(nQuads) = mElementalVariables.at(vname.substr(0, vname.length() - 2) + "_2")(rightB_Quad);
-                    } else {
-                        temp(nQuads) = mElementalVariables.at(vname)(rightB_Quad);
-                    }
-                    mElementalVariables.at(vname) = temp;
-                }
-                for (int i = 0; i < mSideSetNames.size(); i++) {
-                    IColX temp = mSideSets.at(mSideSetNames[i]);
-                    temp.conservativeResize(nQuads + 1,1);
-                    temp(nQuads) = mSideSets.at(mSideSetNames[i])(rightB_Quad);
-                    mSideSets.at(mSideSetNames[i]) = temp;
-                }
-
-                // updating inner nodes for next iteration
-                node0 = node1;
-                node3 = node2;
-
-                mABfield.push_back({1,iABCcopy});
-                nQuads++;
-            }
-
-            mSideSets.at(mSSNameRightB)(nQuads - 1) = 1; // last boundary element is placed at edge of the mesh
+    for (int i = 0; i < rightBQuadTags.size(); i++) {
+        int myQuad = rightBQuadTags[i];
+        int side = getSideRightB(myQuad);
+        int node3_ini = mConnectivity(myQuad, side + 1);
+        int node1_ini = nNodes + i * mN_ABC;
+        mConnectivity.row(nQuads + mN_ABC * i) << mConnectivity(myQuad, side), node1_ini, node1_ini + mN_ABC, node3_ini;
+        for (int j = 0; j < mN_ABC - 1; j++) {
+            int node0 = node1_ini + j;
+            mConnectivity.row(nQuads + i * mN_ABC + j + 1) << node0, node0 + 1, node0 + mN_ABC + 1, node0 + mN_ABC;
+        }
+        mNodalS.segment(node1_ini + mN_ABC, mN_ABC) = RDColX::LinSpaced(mN_ABC, mNodalS(node3_ini) + mHmax, mNodalS(node3_ini) + mN_ABC * mHmax);
+        mNodalZ.segment(node1_ini + mN_ABC, mN_ABC) = RDColX::Constant(mN_ABC, 1, mNodalZ(node3_ini));
+        mSideSets.at(mSSNameRightB)(myQuad) = -1;
+        for (auto it = mSideSets.begin(); it != mSideSets.end(); it++) {
+            it->second.segment(nQuads + i * mN_ABC, mN_ABC) = IColX::Constant(mN_ABC, 1, it->second(myQuad));
+        }
+        mSideSets.at(mSSNameRightB)(nQuads + (i + 1) * mN_ABC - 1) = 1;
+        mABfield(myQuad, 1) = 0;
+        mABfield.block(nQuads + i * mN_ABC, 1, mN_ABC, 1) = IColX::Constant(mN_ABC, 1, 1);
+        mABfield.block(nQuads + i * mN_ABC, 0, mN_ABC, 1) = IColX::Constant(mN_ABC, 1, myQuad);
+        for (auto it = mElementalVariables_elem.begin(); it != mElementalVariables_elem.end(); it++) {
+            it->second.segment(nQuads + i * mN_ABC, mN_ABC) = RDColX::Constant(mN_ABC, 1, it->second(myQuad));
         }
     }
 
-    // update quad number to include right boundary zone
-    nQuads_ini = nQuads;
-    mapABCtoGlobal.clear();
+    // lower boundary
+    nQuads = getNumQuads();
+    nNodes = getNumNodes();;
 
-    // add boundary at y0 (lower bound)
-    // same principle - see comments of section above
-    for (int lowerB_Quad = 0; lowerB_Quad < nQuads_ini; lowerB_Quad++) {
+    std::vector<int> lowerBQuadTags;
+    for (int tag = 0; tag < nQuads; tag++) {
+        if (getSideLowerB(tag) >= 0) {
+            lowerBQuadTags.push_back(tag);
+        }
+    }
+    ExtNr = lowerBQuadTags.size() * mN_ABC;
+    mNodalS.conservativeResize(nNodes + ExtNr + mN_ABC, 1);
+    mNodalZ.conservativeResize(nNodes + ExtNr + mN_ABC, 1);
+    mConnectivity.conservativeResize(nQuads + ExtNr, 4);
+    mABfield.conservativeResize(nQuads + ExtNr, 2);
+    for (auto it = mSideSets.begin(); it != mSideSets.end(); it++) {
+        it->second.conservativeResize(nQuads + ExtNr, 1);
+        it->second.segment(nQuads, ExtNr) = IColX::Constant(ExtNr, 1, -1);
+    }
+    for (auto it = mElementalVariables_elem.begin(); it != mElementalVariables_elem.end(); it++) {
+        it->second.conservativeResize(nQuads + ExtNr, 1);
+    }
 
-        if (getSideLowerB(lowerB_Quad) == 0) {
-            mSideSets.at(mSSNameLowerB)(lowerB_Quad) = -1;
+    int BottomLeftNode = mConnectivity(lowerBQuadTags[0], 0);
+    mNodalS.segment(nNodes, mN_ABC) = RDColX::Constant(mN_ABC, 1, mNodalS(BottomLeftNode));
+    mNodalZ.segment(nNodes, mN_ABC) = RDColX::Constant(mN_ABC, 1, mNodalZ(BottomLeftNode)) - RDColX::LinSpaced(mN_ABC, mHmax, mN_ABC * mHmax);
 
-            if (mABfield[lowerB_Quad](0) == -1) {
-                mABfield[lowerB_Quad] = {0,++iABCcopy};
-            }
+    int CornerQuadTag;
+    for (int i = 0; i < lowerBQuadTags.size(); i++) {
+        int myQuad = lowerBQuadTags[i];
+        int side = getSideLowerB(myQuad);
+        int node2_ini = mConnectivity(myQuad, side + 1);
+        int node0_ini = nNodes + i * mN_ABC;
+        mConnectivity.row(nQuads + mN_ABC * i) << node0_ini, node0_ini + mN_ABC, node2_ini, mConnectivity(myQuad, side);
+        for (int j = 0; j < mN_ABC - 1; j++) {
+            int node0 = node0_ini + j + 1;
+            mConnectivity.row(nQuads + i * mN_ABC + j + 1) << node0, node0 + mN_ABC, node0 + mN_ABC - 1, node0 - 1;
+        }
+        mNodalS.segment(node0_ini + mN_ABC, mN_ABC) = RDColX::Constant(mN_ABC, 1, mNodalS(node2_ini));
+        mNodalZ.segment(node0_ini + mN_ABC, mN_ABC) = RDColX::Constant(mN_ABC, 1, mNodalZ(node2_ini)) - RDColX::LinSpaced(mN_ABC, mHmax, mN_ABC * mHmax);
+        mSideSets.at(mSSNameLowerB)(myQuad) = -1;
+        for (auto it = mSideSets.begin(); it != mSideSets.end(); it++) {
+            it->second.segment(nQuads + i * mN_ABC, mN_ABC) = IColX::Constant(mN_ABC, 1, it->second(myQuad));
+        }
+        mSideSets.at(mSSNameLowerB)(nQuads + (i + 1) * mN_ABC - 1) = 0;
 
-            node2 = mConnectivity(lowerB_Quad,1);
-            node3 = mConnectivity(lowerB_Quad,0);
-
-            for (int n = 1; n <= mN_ABC; n++) {
-                set1 = 0;
-                set2 = 0;
-
-                node0coords[0] = mNodalS(node3);
-                node0coords[1] = mNodalZ(node3) - mHmax;
-                node1coords[0] = mNodalS(node2);
-                node1coords[1] = mNodalZ(node2) - mHmax;
-
-                for (int i = 0; i < nNewNodes_bottom; i++){
-                    if (NewNodeCoords_bottom[i] == node0coords) {
-                        node0 = mapABCtoGlobal[i];
-                        set1 = 1;
-                    }
-                    if (NewNodeCoords_bottom[i] == node1coords) {
-                        node1 = mapABCtoGlobal[i];
-                        set2 = 1;
-                    }
-                }
-
-                if (!set1) {
-                    node0 = nNodes;
-                    NewNodeCoords_bottom.push_back(node0coords);
-                    mapABCtoGlobal.push_back(nNodes);
-                    mNodalS.conservativeResize(nNodes + 1, 1);
-                    mNodalS[nNodes] = node0coords[0];
-                    mNodalZ.conservativeResize(nNodes + 1, 1);
-                    mNodalZ[nNodes] = node0coords[1];
-                    nNodes++;
-                    nNewNodes_bottom++;
-                }
-                if (!set2) {
-                    node1 = nNodes;
-                    NewNodeCoords_bottom.push_back(node1coords);
-                    mapABCtoGlobal.push_back(nNodes);
-                    mNodalS.conservativeResize(nNodes + 1, 1);
-                    mNodalS[nNodes] = node1coords[0];
-                    mNodalZ.conservativeResize(nNodes + 1, 1);
-                    mNodalZ[nNodes] = node1coords[1];
-                    nNodes++;
-                    nNewNodes_bottom++;
-                }
-
-                newABCelem = {node0, node1, node2, node3};
-                mConnectivity.conservativeResize(nQuads + 1, 4);
-                mConnectivity.row(nQuads) = newABCelem;
-
-                for (int i = 0; i < mElementalVariableNames.size(); i++) {
-                    std::string vname = mElementalVariableNames[i];
-                    RDColX temp = mElementalVariables.at(vname);
-                    temp.conservativeResize(nQuads + 1,1);
-                    // handling gradients near the boundary -> only constant values from nodes at edge are passed on
-                    if (vname.substr(vname.length() - 2, 2) == std::string("_2")) {
-                        temp(nQuads) = mElementalVariables.at(vname.substr(0, vname.length() - 2) + "_1")(lowerB_Quad);
-                    } else if (vname.substr(vname.length() - 2, 2) == std::string("_3")) {
-                        temp(nQuads) = mElementalVariables.at(vname.substr(0, vname.length() - 2) + "_0")(lowerB_Quad);
-                    } else {
-                        temp(nQuads) = mElementalVariables.at(vname)(lowerB_Quad);
-                    }
-                    mElementalVariables.at(vname) = temp;
-                }
-                for (int i = 0; i < mSideSetNames.size(); i++) {
-                    IColX temp = mSideSets.at(mSideSetNames[i]);
-                    temp.conservativeResize(nQuads + 1,1);
-                    temp(nQuads) = mSideSets.at(mSideSetNames[i])(lowerB_Quad);
-                    mSideSets.at(mSideSetNames[i]) = temp;
-                }
-                mSideSets.at(mSSNameLowerB)(mSideSets.at(mSSNameLowerB).rows() - 1) = (n == mN_ABC) ? 0 : -1;
-
-                node2 = node1;
-                node3 = node0;
-
-                mABfield.push_back({1,iABCcopy-1});
-                nQuads++;
-            }
-
-            mSideSets.at(mSSNameLowerB)(nQuads - 1) = 0;
+        if (mABfield(myQuad, 1) == -1) {
+            mABfield(myQuad, 1) = 0;
+            mABfield.block(nQuads + i * mN_ABC, 1, mN_ABC, 1) = IColX::Constant(mN_ABC, 1, 2);
+            mABfield.block(nQuads + i * mN_ABC, 0, mN_ABC, 1) = IColX::Constant(mN_ABC, 1, myQuad);
+        } else if (mABfield(myQuad, 1) == 0) {
+            CornerQuadTag = myQuad;
+            mABfield.block(nQuads + i * mN_ABC, 1, mN_ABC, 1) = IColX::Constant(mN_ABC, 1, 2);
+            mABfield.block(nQuads + i * mN_ABC, 0, mN_ABC, 1) = IColX::Constant(mN_ABC, 1, myQuad);
+        } else if (mABfield(myQuad, 1) == 1) {
+            mABfield.block(nQuads + i * mN_ABC, 1, mN_ABC, 1) = IColX::Constant(mN_ABC, 1, 3);
+            mABfield.block(nQuads + i * mN_ABC, 0, mN_ABC, 1) = IColX::Constant(mN_ABC, 1, CornerQuadTag);
+        }
+        for (auto it = mElementalVariables_elem.begin(); it != mElementalVariables_elem.end(); it++) {
+            it->second.segment(nQuads + i * mN_ABC, mN_ABC) = RDColX::Constant(mN_ABC, 1, it->second(myQuad));
         }
     }
 }
@@ -659,7 +616,7 @@ std::string ExodusModel::verbose() const {
         widthname = std::max(widthname, (int)(it->first.length()));
     }
     for (auto it = mGlobalRecords.begin(); it != mGlobalRecords.end(); it++) {
-        widthname = std::max(widthname, (int)(it->first.length()));    
+        widthname = std::max(widthname, (int)(it->first.length()));
     }
     for (auto it = mGlobalVariables.begin(); it != mGlobalVariables.end(); it++) {
         ss << "    " << std::setw(widthname) << it->first << "   =   " << it->second << std::endl;
@@ -682,10 +639,15 @@ std::string ExodusModel::verbose() const {
     ss << "  Coordinates_______________________________________________" << std::endl;
     ss << "    " << std::setw(width) << 0 << ": ";
     ss << std::setw(13) << mNodalS(0) << std::setw(13) << mNodalZ(0) << std::endl;
-    ss<< "    " << std::setw(width) << "..." << std::endl;
-    ss << "    " << std::setw(width) << getNumNodes() - 1 << ": ";
-    ss << std::setw(13) << mNodalS(getNumNodes() - 1) << std::setw(13) << mNodalZ(getNumNodes() - 1) << std::endl;
-    
+    ss << "    " << std::setw(width) << "..." << std::endl;
+    ss << "    " << std::setw(width) << mNumNodesInner - 1 << ": ";
+    ss << std::setw(13) << mNodalS(mNumNodesInner - 1) << std::setw(13) << mNodalZ(mNumNodesInner - 1) << std::endl;
+    if (hasExtension()) {
+        ss << "    " << std::setw(width) << "..." << std::endl;
+        ss << "    " << std::setw(width) << "extended boundary ends at" << std::endl;
+        ss << "    " << std::setw(width) << getNumNodes() << ": ";
+        ss << std::setw(13) << mNodalS(getNumNodes() - 1) << std::setw(13) << mNodalZ(getNumNodes() - 1) << std::endl;
+    }
     ss << "  Elemental Variables_______________________________________" << std::endl;
     widthname = -1;
     for (auto it = mElementalVariables_elem.begin(); it != mElementalVariables_elem.end(); it++) {
@@ -694,7 +656,7 @@ std::string ExodusModel::verbose() const {
     for (auto it = mElementalVariables_elem.begin(); it != mElementalVariables_elem.end(); it++) {
         ss << "    " << std::setw(widthname) << it->first << ": ";
         ss << std::setw(13) << it->second(0) << ", ..., ";
-        ss << std::setw(13) << it->second(getNumQuads() - 1) << std::endl;        
+        ss << std::setw(13) << it->second(getNumQuads() - 1) << std::endl;
     }
     
     ss << "  Depth-dependent Elemental Variables_______________________" << std::endl;
@@ -720,7 +682,7 @@ std::string ExodusModel::verbose() const {
             pair += (int)(it->second(q) >= 0);
         }
         ss << pair;
-        if (hasABC()) {
+        if (hasExtension()) {
             pair = 0;
             for (int q = mNumQuadsInner; q < getNumQuads(); q++) {
                 pair += (int)(it->second(q) >= 0);
@@ -739,7 +701,7 @@ std::string ExodusModel::verbose() const {
     return ss.str();
 }
 
-void ExodusModel::buildInparam(ExodusModel *&exModel, const Parameters &par, 
+void ExodusModel::buildInparam(ExodusModel *&exModel, const Parameters &par,
     AttParameters *&attPar, int verbose) {
     if (exModel) {
         delete exModel;
@@ -749,13 +711,23 @@ void ExodusModel::buildInparam(ExodusModel *&exModel, const Parameters &par,
     exfile = Parameters::sInputDirectory + "/" + exfile;
     exModel = new ExodusModel(exfile);
 
-    exModel->mN_ABC = par.getValue<int>("ABC_ELEMENTS");
+    if (par.getValue<bool>("ABC_LOW-ORDER_EXTENSION")) {
+        exModel->mHasExtension = true;
+        exModel->mABCwidth = par.getValue<double>("ABC_LOW-ORDER_EXTENSION_WIDTH");
+        exModel->mHasSpongeABC = false;
+    } else {
+        exModel->mHasSpongeABC = par.getValue<bool>("ABC_SPONGE_BOUNDARIES");
+        exModel->mHasExtension = par.getValue<bool>("ABC_SPONGE_BOUNDARIES");
+        exModel->mABCwidth = par.getValue<double>("ABC_SPONGE_BOUNDARIES_WIDTH");
+    }
+    exModel->mHasStaceyABC = par.getValue<bool>("ABC_STACEY_BOUNDARIES");
+    exModel->mTSource = 2 * par.getValue<double>("SOURCE_STF_HALF_DURATION");
 
     exModel->initialize();
     if (verbose) {
         XMPI::cout << exModel->verbose();
     }
-    
+
     // form attenuation parameters
     if (exModel->hasAttenuation()) {
         int nr_lin_solids = (int)exModel->mGlobalVariables.at("nr_lin_solids");
@@ -780,7 +752,7 @@ void ExodusModel::buildInparam(ExodusModel *&exModel, const Parameters &par,
             attPar = 0;
         }
     }
-    
+
     // ellipticity
     if (exModel->isCartesian()) {
         return;
@@ -793,7 +765,7 @@ void ExodusModel::buildInparam(ExodusModel *&exModel, const Parameters &par,
         double inv_f = par.getValue<double>("MODEL_3D_ELLIPTICITY_INVF");
         if (inv_f <= 0.) {
             throw std::runtime_error("ExodusModel::buildInparam || Invalid flattening.");
-        } 
+        }
         Geodesy::setup(exModel->getROuter(), 1. / inv_f, exModel->mEllipKnots, exModel->mEllipCoeffs);
     }
 }

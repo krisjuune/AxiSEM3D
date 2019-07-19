@@ -58,8 +58,8 @@ public:
     
     // verbose
     std::string verbose() const;
-    
-    bool fluid() const;
+
+    bool fluid() const {return true;}
 
     Acoustic * getAcoustic() const {return mAcoustic;};
 

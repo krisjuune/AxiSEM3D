@@ -11,7 +11,7 @@
 
 void FieldFFT::transformF2P(const vec_CMatPP &uc, int Nr) {
     int Nu = Nr / 2;
-    CMatXN &ucf = SolverFFTW_N::getC2R_CMat(Nr);
+    CMatXN &ucf = SolverFFTW_N::getC2R_CMat();
     for (int alpha = 0; alpha <= Nu; alpha++) {
         for (int j = 0; j < nPntEdge; j++) {
             ucf.block(alpha, nPntEdge * j, 1, nPntEdge) = uc[alpha].block(j, 0, 1, nPntEdge);
@@ -50,8 +50,9 @@ void FieldFFT::transformP2F(vec_CMatPP &uc, int Nr) {
     int Nu = Nr / 2;
     // input from SolverFFTW_N::getR2C_RMat(Nr);
     SolverFFTW_N::computeR2C(Nr);
-    CMatXN &ucf = SolverFFTW_N::getR2C_CMat(Nr);
+    CMatXN &ucf = SolverFFTW_N::getR2C_CMat();
     for (int alpha = 0; alpha <= Nu; alpha++) {
+        uc.push_back(CMatPP::Zero());
         for (int j = 0; j < nPntEdge; j++) {
             uc[alpha].block(j, 0, 1, nPntEdge) = ucf.block(alpha, nPntEdge * j, 1, nPntEdge);
         }

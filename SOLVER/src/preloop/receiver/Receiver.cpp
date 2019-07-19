@@ -1,6 +1,6 @@
 // Receiver.cpp
-// created by Kuangdai on 13-May-2016 
-// receiver   
+// created by Kuangdai on 13-May-2016
+// receiver
 
 #include "Receiver.h"
 #include "XMath.h"
@@ -16,11 +16,11 @@
 #include <iomanip>
 #include "XMPI.h"
 
-Receiver::Receiver(const std::string &name, const std::string &network, 
-    double theta_lat, double phi_lon, bool geographic, 
+Receiver::Receiver(const std::string &name, const std::string &network,
+    double theta_lat, double phi_lon, bool geographic,
     double depth, bool dumpStrain, bool dumpCurl,
     double srcLat, double srcLon, double srcDep,
-    bool kmconv):
+    bool cartesian):
 mName(name), mNetwork(network), mDepth(depth), mDumpStrain(dumpStrain), mDumpCurl(dumpCurl) {
     RDCol3 rtpG, rtpS;
     if (geographic) {
@@ -30,7 +30,7 @@ mName(name), mNetwork(network), mDepth(depth), mDumpStrain(dumpStrain), mDumpCur
         rtpS = Geodesy::rotateGlob2Src(rtpG, srcLat, srcLon, srcDep);
     } else {
         rtpS(0) = 1.;
-        if (kmconv) {
+        if (cartesian) {
           rtpS(1) = theta_lat * 1000 / Geodesy::getROuter();
         } else {
           rtpS(1) = theta_lat * degree;
@@ -43,12 +43,9 @@ mName(name), mNetwork(network), mDepth(depth), mDumpStrain(dumpStrain), mDumpCur
     mLat = Geodesy::theta2Lat_d(rtpG(1), mDepth);
     mLon = Geodesy::phi2Lon(rtpG(2));
     mBackAzimuth = Geodesy::backAzimuth(srcLat, srcLon, srcDep, mLat, mLon, mDepth);
-    // // test
-    // XMPI::cout << name << " " << network << " "; 
-    // XMPI::cout << mLat << " " << mLon << " " << " 0.0 " << mDepth << XMPI::endl;
 }
 
-void Receiver::release(PointwiseRecorder &recorderPW, const Domain &domain, 
+void Receiver::release(PointwiseRecorder &recorderPW, const Domain &domain,
     int elemTag, const RDMatPP &interpFact) {
     Element *myElem = domain.getElement(elemTag);
     if (mDumpStrain || mDumpCurl) {
@@ -58,7 +55,7 @@ void Receiver::release(PointwiseRecorder &recorderPW, const Domain &domain,
         mLat, mLon, mDepth, mDumpStrain, mDumpCurl);
 }
 
-bool Receiver::locate(const Mesh &mesh, int &elemTag, int &quadTag, bool depthInRef) const {
+bool Receiver::locate(const Mesh &mesh, int &elemTag, int &quadTag, bool depthInRef, bool cartesian) const {
     RDCol2 recCrds, srcXiEta;
     double r = 0.;
     if (depthInRef) {
@@ -68,6 +65,9 @@ bool Receiver::locate(const Mesh &mesh, int &elemTag, int &quadTag, bool depthIn
     }
     recCrds(0) = r * sin(mTheta);
     recCrds(1) = r * cos(mTheta);
+    if (cartesian) {
+        recCrds(1) = mesh.computeRadiusRef(mDepth, mLat, mLon);
+    }
     if (recCrds(0) > mesh.sMax() + tinySingle || recCrds(0) < mesh.sMin() - tinySingle) {
         return false;
     }
@@ -135,4 +135,3 @@ std::string Receiver::verbose(bool geographic, int wname, int wnet) const {
     ss << mDepth;
     return ss.str();
 }
-

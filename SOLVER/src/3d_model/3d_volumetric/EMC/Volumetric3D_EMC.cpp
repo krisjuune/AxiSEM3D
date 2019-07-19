@@ -255,8 +255,8 @@ void Volumetric3D_EMC::initialize(const std::vector<std::string> &params) {
 bool Volumetric3D_EMC::get3dProperties(double r, double theta, double phi, double rElemCenter,
     std::vector<MaterialProperty> &properties, 
     std::vector<MaterialRefType> &refTypes,
-    std::vector<double> &values) const {
-    
+    std::vector<double> &values, bool isFluid) const {
+
     // header
     properties = std::vector<MaterialProperty>(1, mMaterialProp);
     refTypes = std::vector<MaterialRefType>(1, mReferenceType);

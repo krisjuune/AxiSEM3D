@@ -9,7 +9,7 @@ class ConstNrField: public NrField {
 public:
     ConstNrField(bool useLucky, int nu);
     
-    int getNrAtPoint(const RDCol2 &coords) const;
+    int getNrAtPointInternal(const RDCol2 &coords) const;
     
     std::string verbose() const;
     

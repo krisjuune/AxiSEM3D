@@ -25,7 +25,9 @@ typedef Eigen::Matrix<double, Eigen::Dynamic, 1> RDColX;
 typedef Eigen::Matrix<ComplexD, Eigen::Dynamic, 1> CDColX;
 typedef Eigen::Matrix<double, Eigen::Dynamic, 4> RDMatX4;
 typedef std::array<RDColX, nPntElem> arPP_RDColX;
-// spectral 
+typedef Eigen::Matrix<int, Eigen::Dynamic, 2> IMatX2;
+
+// spectral
 typedef Eigen::Matrix<double, nPntEdge, nPntEdge, Eigen::RowMajor> RDMatPP;
 typedef Eigen::Matrix<ComplexD, nPntEdge, nPntEdge, Eigen::RowMajor> CDMatPP;
 typedef std::vector<CDMatPP> vec_CDMatPP;
@@ -41,6 +43,8 @@ typedef Eigen::Matrix<int, Eigen::Dynamic, 1> IColX;
 typedef Eigen::Matrix<int, Eigen::Dynamic, 4> IMatX4;  
 
 // others
+typedef Eigen::Matrix<double, 4, 1> RDCol4;
+typedef Eigen::Matrix<bool, 4, 1> BCol4;
 typedef Eigen::Matrix<double, nPntEdge, 1> RDColP; // spectral constants
 typedef Eigen::Matrix<double, Eigen::Dynamic, nPntElem * 4> RDMatXN4;
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> RDMatXX;

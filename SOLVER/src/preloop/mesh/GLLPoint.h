@@ -7,6 +7,7 @@
 #include "eigenp.h"
 
 class Domain;
+class ABC;
 
 class GLLPoint {
 public:
@@ -21,8 +22,8 @@ public:
         mSFNormal += normal; 
         mSFNormal_assmble += normal;
     };
-    void addGamma(const double gamma) {mGamma = gamma;};
-    RDCol2 getCoords() const {return mCoords;};
+    void addABCNormal(const RDMatX3 &normal) {mABCNormal += normal;};
+    void setABC(RDColX gamma, RDColX rho, RDColX vp, RDColX vs);
 
     void setOceanDepth(const RDColX &depth) {mOceanDepth = depth;};
     void addSurfNormal(const RDMatX3 &normal) {mSurfNormal += normal;};
@@ -33,8 +34,8 @@ public:
     // gets 
     int getNr() const {return mNr;};
     int getReferenceCount() const {return mReferenceCount;};
-    const RDCol2 &getCoords() const {return mCoords;};
-    
+    const RDCol2& getCoords() const {return mCoords;};
+
     // feed/extract buffer
     void feedBuffer(RDMatXX &buffer, int col);
     void extractBuffer(RDMatXX &buffer, int col);
@@ -65,6 +66,7 @@ private:
     // total reference count
     int mReferenceCount;
 
-    double mGamma;
+    RDMatX3 mABCNormal;
+    ABC *mABC;
 
 };

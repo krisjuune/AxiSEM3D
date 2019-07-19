@@ -13,6 +13,8 @@
 #include "Domain.h"
 #include "XMath.h"
 #include "Geodesy.h"
+#include "ABC.h"
+#include "PreloopFFTW.h"
 
 #include "MassOcean1D.h"
 #include "MassOcean3D.h"
@@ -41,12 +43,21 @@ void GLLPoint::setup(int nr, bool axial, bool surface, const RDCol2 &crds, doubl
         mSFNormal_assmble = RDMatX3::Zero(mNr, 3);
         mOceanDepth = RDColX::Zero(mNr);
         mSurfNormal = RDMatX3::Zero(mNr, 3);
+        mABCNormal = RDMatX3::Zero(mNr, 3);
+        mABC = 0;
         mReferenceCount = 1;
-        mGamma = 0;
+    }
+}
+
+void GLLPoint::setABC(RDColX gamma, RDColX rho, RDColX vp, RDColX vs) {
+    if (!mABC) {
+        mABC = new ABC(gamma, rho.array() * vp.array(), rho.array() * vs.array(), mNr);
     }
 }
 
 int GLLPoint::release(Domain &domain) const {
+    if (mABC) mABC->setNormal(mABCNormal);
+    
     // solid fluid
     bool isSolid = mMassSolid.norm() > tinyDouble;
     bool isFluid = mMassFluid.norm() > tinyDouble; 
@@ -79,7 +90,7 @@ int GLLPoint::release(Domain &domain) const {
                 mass = new Mass3D(invMass.cast<Real>());
             }
         }
-        solid = new SolidPoint(mNr, mIsAxial, mCoords, mass, mGamma);
+        solid = new SolidPoint(mNr, mIsAxial, mCoords, mass, mABC);
     }
     
     // fluid point ptr
@@ -92,10 +103,11 @@ int GLLPoint::release(Domain &domain) const {
             const RDColX &invMass = mMassFluid.array().pow(-1.).matrix(); 
             mass = new Mass3D(invMass.cast<Real>());
         }
-        fluid = new FluidPoint(mNr, mIsAxial, mCoords, mass, mOnSurface);
+        fluid = new FluidPoint(mNr, mIsAxial, mCoords, mass, mOnSurface, mABC);
     }
     
     // released as different point classes
+    SolidFluidPoint *sfpoint;
     if (isSolid && isFluid) {
         SFCoupling *couple;
         if (XMath::equalRows(mSFNormal_assmble) && XMath::equalRows(mMassFluid)) {
@@ -134,7 +146,8 @@ void GLLPoint::feedBuffer(RDMatXX &buffer, int col) {
     buffer.block(nr, col, nr, 1) = mMassFluid;
     buffer.block(nr * 2, col, nr * 3, 1) = Eigen::Map<RDColX>(mSFNormal_assmble.data(), nr * 3);
     buffer.block(nr * 5, col, nr * 3, 1) = Eigen::Map<RDColX>(mSurfNormal.data(), nr * 3);
-    buffer(nr * 8, col) = (double)mReferenceCount;
+    buffer.block(nr * 8, col, nr * 3, 1) = Eigen::Map<RDColX>(mABCNormal.data(), nr * 3);
+    buffer(nr * 11, col) = (double)mReferenceCount;
 }
 
 void GLLPoint::extractBuffer(RDMatXX &buffer, int col) {
@@ -143,7 +156,8 @@ void GLLPoint::extractBuffer(RDMatXX &buffer, int col) {
     mMassFluid += buffer.block(nr, col, nr, 1);
     mSFNormal_assmble += Eigen::Map<RDMatX3>(buffer.block(nr * 2, col, nr * 3, 1).data(), nr, 3);
     mSurfNormal += Eigen::Map<RDMatX3>(buffer.block(nr * 5, col, nr * 3, 1).data(), nr, 3);
-    mReferenceCount += round(buffer(nr * 8, col));
+    mABCNormal += Eigen::Map<RDMatX3>(buffer.block(nr * 8, col, nr * 3, 1).data(), nr, 3);
+    mReferenceCount += round(buffer(nr * 11, col));
 }
 
 

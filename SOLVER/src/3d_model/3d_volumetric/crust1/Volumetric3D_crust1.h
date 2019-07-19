@@ -16,8 +16,8 @@ public:
     bool get3dProperties(double r, double theta, double phi, double rElemCenter,
         std::vector<MaterialProperty> &properties, 
         std::vector<MaterialRefType> &refTypes,
-        std::vector<double> &values) const;
-    
+        std::vector<double> &values, bool isFluid) const;
+
     std::string verbose() const;
     
     void setupExodusModel(const ExodusModel *exModel);

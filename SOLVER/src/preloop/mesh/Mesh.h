@@ -115,6 +115,8 @@ private:
     RDCol2 mU0_range, mVref_range;
     ABCParameters *mABCPar;
 
+    bool mRecordingWF;
+
     /////////////////////// local build ///////////////////////
     // Quads
     std::vector<Quad *> mQuads;

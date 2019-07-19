@@ -62,9 +62,6 @@ void PressureSource::computeSourceFourier(const Quad &myQuad, const RDColP &inte
                     fouriers[ipnt](1, 0) += fact * dwdz * mM0 * (X1 - X2) / (4. * pi);
                     fouriers[ipnt](1, 1) += fact * dwdz * mM0 * (X1 - iid * X2) / (4. * pi) * iid;
                 } else {
-                    if (myQuad.hasRelabelling() && myQuad.isFluid()) {
-                        std::cout << "Warning: relabelling of fluid source neglected." << std::endl;
-                    }
                     // monopole
                     fouriers[ipnt](0, 0) += fact * dwds * 2 * mM0 / (2. * pi);
                     fouriers[ipnt](0, 2) += fact * dwdz * mM0 / (2. * pi);
@@ -77,11 +74,11 @@ void PressureSource::computeSourceFourier(const Quad &myQuad, const RDColP &inte
 std::string PressureSource::verbose() const {
     std::stringstream ss;
     ss << "\n========================== Source ==========================" << std::endl;
-    ss << "  Type         =   " << "PressureSource" << std::endl;
-    ss << "  Latitude     =   " << mLatitude << std::endl;
-    ss << "  Longitude    =   " << mLongitude << std::endl;
-    ss << "  Depth (km)   =   " << mDepth / 1e3 << std::endl;
-    ss << "  Moment (N.m) =   " << (mM0 >= 0. ? " " : "") << mM0 << std::endl;
+    ss << "  Type            =   " << "PressureSource" << std::endl;
+    ss << "  Latitude        =   " << mLatitude << std::endl;
+    ss << "  Longitude       =   " << mLongitude << std::endl;
+    ss << "  Depth (km)      =   " << mDepth / 1e3 << std::endl;
+    ss << "  Pressure (N/m2) =   " << (mM0 >= 0. ? " " : "") << mM0 << std::endl;
     ss << "========================== Source ==========================\n" << std::endl;
     return ss.str();
 }

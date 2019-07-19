@@ -93,12 +93,11 @@ Material::Material(const Quad *myQuad, const ExodusModel &exModel): mMyQuad(myQu
     }
 }
 
-void Material::addVolumetric3D(const std::vector<Volumetric3D *> &m3D, 
-    double srcLat, double srcLon, double srcDep, double phi2D) {
+void Material::addVolumetric3D(const std::vector<Volumetric3D *> &m3D,
+    double srcLat, double srcLon, double srcDep, double phi2D, const int ABPosition) {
     if (m3D.size() == 0) {
         return;
-    }    
-        
+    }
     // pointers for fast access to material matrices
     std::vector<RDRow4 *>  prop1DPtr = {&mVpv1D, &mVph1D, &mVsv1D, &mVsh1D, &mRho1D, &mEta1D, &mQkp1D, &mQmu1D,
                                         &mVpv1D, &mVsv1D, // these two take no other effect than occupying the slots  
@@ -126,8 +125,21 @@ void Material::addVolumetric3D(const std::vector<Volumetric3D *> &m3D,
     int Nr = mMyQuad->getNr();
     for (int ipol = 0; ipol <= nPol; ipol++) {
         for (int jpol = 0; jpol <= nPol; jpol++) {
-            // geographic oordinates of cardinal points
-            const RDCol2 &xieta = SpectralConstants::getXiEta(ipol, jpol, mMyQuad->isAxial());
+            // geographic coordinates of cardinal points
+
+            // coordinates of reference points if copied for absorbing boundary
+            int refloc_i = ipol;
+            int refloc_j = jpol;
+            if (ABPosition == 1) { // right boundary
+                refloc_i = nPol;
+            } else if (ABPosition == 2) { //lower boundary
+                refloc_j = nPol;
+            } else if (ABPosition == 3) { //corner
+                refloc_i = nPol;
+                refloc_j = nPol;
+            }
+
+            const RDCol2 &xieta = SpectralConstants::getXiEta(refloc_i, refloc_j, mMyQuad->isAxial());
             const RDMatX3 &rtp = mMyQuad->computeGeocentricGlobal(srcLat, srcLon, srcDep, xieta, Nr, phi2D);
             int ipnt = ipol * nPntEdge + jpol;
             for (int alpha = 0; alpha < Nr; alpha++) {
@@ -141,7 +153,7 @@ void Material::addVolumetric3D(const std::vector<Volumetric3D *> &m3D,
                     std::vector<Volumetric3D::MaterialProperty> properties; 
                     std::vector<Volumetric3D::MaterialRefType> refTypes;
                     std::vector<double> values;
-                    if (!model->get3dProperties(r, t, p, rElemCenter, properties, refTypes, values)) {
+                    if (!model->get3dProperties(r, t, p, rElemCenter, properties, refTypes, values, mMyQuad->isFluid())) {
                         // point (r, t, p) not in model range
                         continue;
                     }
@@ -262,6 +274,8 @@ Acoustic *Material::createAcoustic(bool elem1D) const {
     } else {
         fluidK = mRho3D.replicate(mMyQuad->getNr(), 1).array().pow(-1.);
     }
+    RDMatXN FluidRho_pure = fluidK;
+    
     for (int ipnt = 0; ipnt < nPntElem; ipnt++) {
        fluidK.col(ipnt) *= iFact(ipnt);
     }
@@ -271,9 +285,9 @@ Acoustic *Material::createAcoustic(bool elem1D) const {
     if (elem1D) {
         RDMatPP kstruct;
         XMath::structuredUseFirstRow(fluidK, kstruct);
-        return new Acoustic1D(kstruct.cast<Real>());
+        return new Acoustic1D(kstruct.cast<Real>(),FluidRho_pure.cast<Real>());
     } else {
-        return new Acoustic3D(fluidK.cast<Real>());
+        return new Acoustic3D(fluidK.cast<Real>(),FluidRho_pure.cast<Real>());
     }
 }
 
@@ -676,12 +690,12 @@ RDMatXN Material::getProperty(const std::string &vname, int refType) {
         throw std::runtime_error("Material::getProperty || Unknown field variable name: " + vname);
     }
     
-    if (data3D.rows() != Nr) {
-        data3D = data3D.replicate(Nr, 1);
-    }
+    //if (data3D.rows() != Nr) {
+    //    data3D = data3D.replicate(Nr, 1);
+    //}
     
     // 3D
-    if (refType == SlicePlot::PropertyRefTypes::Property3D) {
+    if (refType == SlicePlot::PropertyRefTypes::Property3D || refType < 0) {
         return data3D;
     }
     

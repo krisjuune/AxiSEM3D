@@ -25,8 +25,8 @@ SET(CMAKE_Fortran_COMPILER     gfortran)
 # uncomment and edit the following lines to specify preferred prefix
 # SET(EIGEN3_ROOT           edit_here)
 # SET(FFTW_ROOT             edit_here)
-# SET(BOOST_ROOT            edit_here)
-# SET(METIS_ROOT            edit_here)
+SET(BOOST_ROOT /disks/data1/.anaconda3/envs/mpi/)
+SET(METIS_ROOT /disks/data1/.anaconda3/envs/mpi/)
 # SET(NETCDF_ROOT           edit_here)
 # SET(HDF5_ROOT             edit_here)
 
@@ -127,6 +127,7 @@ include_directories(
     src/core/point
     src/core/point/mass
     src/core/point/solid_fluid
+    src/core/point/absorbing_boundaries
 
     src/core/element
     src/core/element/crd
@@ -145,6 +146,7 @@ include_directories(
     src/core/source
     src/core/output/pointwise
     src/core/output/surface
+    src/core/output/wavefields
     src/core/domain
     src/core/newmark
 
@@ -171,11 +173,13 @@ include_directories(
     src/preloop/source/offaxis
     src/preloop/receiver
 
+    src/3d_model
     src/3d_model/3d_volumetric
     src/3d_model/3d_volumetric/s20_s40rts
     src/3d_model/3d_volumetric/crust1
     src/3d_model/3d_volumetric/simple_shapes
     src/3d_model/3d_volumetric/EMC
+    src/3d_model/3d_volumetric/SEG
     src/3d_model/3d_geometric
     src/3d_model/3d_geometric/ellipticity
     src/3d_model/3d_geometric/crust1
@@ -212,6 +216,7 @@ add_executable(
     src/core/point/SolidFluidPoint.cpp
     src/core/point/solid_fluid/SFCoupling1D.cpp
     src/core/point/solid_fluid/SFCoupling3D.cpp
+    src/core/point/absorbing_boundaries/ABC.cpp
 
     src/core/element/material/acoustic/Acoustic1D.cpp
     src/core/element/material/acoustic/Acoustic3D.cpp
@@ -250,6 +255,7 @@ add_executable(
     src/core/output/surface/SurfaceRecorder.cpp
     src/core/output/surface/SurfaceIO.cpp
     src/core/output/surface/SurfaceInfo.cpp
+    src/core/output/wavefields/WavefieldRecorder.cpp
     src/core/domain/Domain.cpp
     src/core/newmark/Newmark.cpp
 
@@ -318,6 +324,7 @@ add_executable(
     src/3d_model/3d_volumetric/simple_shapes/Volumetric3D_bubble.cpp
     src/3d_model/3d_volumetric/simple_shapes/Volumetric3D_cylinder.cpp
     src/3d_model/3d_volumetric/EMC/Volumetric3D_EMC.cpp
+    src/3d_model/3d_volumetric/SEG/Volumetric3D_SEG.cpp
 
     src/3d_model/3d_geometric/Geometric3D.cpp
     src/3d_model/3d_geometric/ellipticity/Ellipticity.cpp

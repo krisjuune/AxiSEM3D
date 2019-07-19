@@ -6,8 +6,10 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <eigenp.h>
 
 class Parameters;
+class AutoGeometricParams;
 
 class Geometric3D {
 public:
@@ -17,7 +19,8 @@ public:
     // initialize internal variables if needed
     virtual void initialize() {};
     virtual void initialize(const std::vector<std::string> &params) {initialize();};
-    
+    virtual void initializeOcean(double rLayer, double rUpper, double rLower, RDColX lat, RDColX lon, RDMatXX bathymetry) {};
+
     // finalize internal variables if needed
     virtual void finalize() {};
     
@@ -29,13 +32,14 @@ public:
     //    conversions from (theta, phi) to (lat, lon) has to be performed internally.
     // b) All models should be defined independently with respect to the perfect sphere.
     virtual double getDeltaR(double r, double theta, double phi, double rElemCenter) const = 0;
-    
-    // verbose 
+    virtual bool isCartesian() {};
+
+    // verbose
     virtual std::string verbose() const = 0;
     
     // build from input parameters
-    static void buildInparam(std::vector<Geometric3D *> &models, 
-        const Parameters &par, int verbose);
+    static void buildInparam(std::vector<Geometric3D *> &models,
+        const Parameters &par, std::vector<AutoGeometricParams *> Vol2GeomModels, int verbose);
 
 };
 

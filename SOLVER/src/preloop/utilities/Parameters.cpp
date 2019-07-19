@@ -38,8 +38,13 @@ void Parameters::registerAll() {
     registerPar("MODEL_PLOT_SLICES_NUM");
     registerPar("MODEL_PLOT_SLICES_LIST");
     registerPar("ATTENUATION");
-    registerPar("ABC_ELEMENTS");
-    registerPar("ABC_FACTOR");
+    registerPar("ABC_SPONGE_BOUNDARIES");
+    registerPar("ABC_SPONGE_BOUNDARIES_WIDTH");
+    registerPar("ABC_SPONGE_BOUNDARIES_FACTOR");
+    registerPar("ABC_LOW-ORDER_EXTENSION");
+    registerPar("ABC_LOW-ORDER_EXTENSION_WIDTH");
+    registerPar("ABC_LOW-ORDER_EXTENSION_ORDER");
+    registerPar("ABC_STACEY_BOUNDARIES");
 
     // inparam.nu
     registerPar("NU_TYPE");
@@ -82,6 +87,10 @@ void Parameters::registerAll() {
     registerPar("OUT_STATIONS_WHOLE_SURFACE");
     registerPar("OUT_STATIONS_DEPTH_REF");
     
+    registerPar("OUT_WAVEFIELD_FRAMES");
+    registerPar("OUT_WAVEFIELD_PHI");
+    registerPar("OUT_WAVEFIELD_TIME_START");
+
     // inparam.advanced
     registerPar("ATTENUATION_CG4");
     registerPar("ATTENUATION_SPECFEM_LEGACY");
