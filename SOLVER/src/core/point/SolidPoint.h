@@ -61,6 +61,8 @@ public:
     // get displacement
     const CMatX3 &getDispFourierSolid() const {return mDispl;};
     
+    void applyABC();
+    
 private:
     
     // mask 

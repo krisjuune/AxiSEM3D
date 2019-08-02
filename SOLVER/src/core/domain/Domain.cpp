@@ -178,6 +178,21 @@ void Domain::updateNewmark(double dt) const {
     #endif
 }
 
+void Domain::applyABC() const {
+    #ifdef _MEASURE_TIMELOOP
+        mTimerPoints->resume();
+    #endif
+    
+    for (const auto &point: mPoints) {
+        point->applyABC();
+    }
+    
+    #ifdef _MEASURE_TIMELOOP
+        mTimerPoints->stop();
+    #endif
+}
+
+
 void Domain::coupleSolidFluid() const {
     #ifdef _MEASURE_TIMELOOP
         mTimerPoints->resume();

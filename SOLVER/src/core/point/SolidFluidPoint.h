@@ -57,6 +57,8 @@ public:
     ///////////// solid-fluid-only /////////////   
     void coupleSolidFluid();
     
+    void applyABC();
+    
     // wisdom
     void learnWisdom(Real cutoff);
     int getNuWisdom() const;

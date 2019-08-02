@@ -567,7 +567,7 @@ std::string Mesh::ABC_verbose() const {
         ss << "    Total Normal Elem.   =   " << mExModel->getNumQuadsInner() << std::endl;
         if (mExModel->hasSpongeABC()) {
             ss << "    Extension Type       =   Kosloff&Kosloff Sponge Boundary" << std::endl;
-            ss << "      Att. Multiplier      =   " << mABCPar->Ufac << std::endl;
+            ss << "      Att. Multiplier      =   " << mABCPar->U << std::endl;
             ss << "      Reference Velocities =   " << mVref_range[0] << " ... " << mVref_range[1] << std::endl;
             ss << "      Max. Attenuations    =   " << mU0_range[0] << " ... " << mU0_range[1] << std::endl;
         } else {

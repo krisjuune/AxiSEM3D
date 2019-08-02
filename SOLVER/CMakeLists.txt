@@ -323,6 +323,7 @@ add_executable(
     src/3d_model/3d_volumetric/crust1/Volumetric3D_crust1.cpp
     src/3d_model/3d_volumetric/simple_shapes/Volumetric3D_bubble.cpp
     src/3d_model/3d_volumetric/simple_shapes/Volumetric3D_cylinder.cpp
+    src/3d_model/3d_volumetric/simple_shapes/Volumetric3D_block.cpp
     src/3d_model/3d_volumetric/EMC/Volumetric3D_EMC.cpp
     src/3d_model/3d_volumetric/SEG/Volumetric3D_SEG.cpp
 

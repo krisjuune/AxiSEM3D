@@ -24,8 +24,6 @@ SolidPoint::~SolidPoint() {
 
 void SolidPoint::updateNewmark(Real dt) {
     // calculate new acceleration
-
-    if (mABC) mStiff -= mABC->StaceyTraction(mVeloc);
     
     // mask stiff
     maskField(mStiff);
@@ -36,10 +34,7 @@ void SolidPoint::updateNewmark(Real dt) {
     // update dt
     double half_dt = half * dt;
     double half_dt_dt = half_dt * dt;
-    
-    // damp acceleration in sponge boundary
-    if (mABC) mABC->applyKosloffDamping(mStiff, mVeloc, mDispl);
-    
+
     // update velocity and old acceleration
     mVeloc += (Real)half_dt * (mAccel + mStiff);
     mAccel = mStiff;
@@ -48,6 +43,13 @@ void SolidPoint::updateNewmark(Real dt) {
 
     // zero stiffness for next time step
     mStiff.setZero();
+}
+
+void SolidPoint::applyABC() {
+    if (mABC) {
+        mStiff -= mABC->StaceyTraction(mVeloc);
+        mABC->applyKosloffDamping(mStiff, mVeloc, mDispl);
+    }
 }
 
 void SolidPoint::resetZero() {

@@ -61,6 +61,8 @@ public:
     // get displacement
     const CColX &getDispFourierFluid() const {return mDispl;};
     
+    void applyABC();
+    
 private:
     
     // mask 

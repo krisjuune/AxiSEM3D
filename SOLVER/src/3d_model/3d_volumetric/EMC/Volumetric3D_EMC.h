@@ -32,6 +32,7 @@ private:
     double mFactor = 1.0;
     
     // use geocentric or geographic
+    bool mCartesian = false;
     bool mGeographic = false;
     
     // one-file-per-depth format

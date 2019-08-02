@@ -24,6 +24,11 @@ SolidFluidPoint::~SolidFluidPoint() {
     delete mSFCoupling;
 }
 
+
+void SolidFluidPoint::applyABC() {
+    // nothing
+}
+
 void SolidFluidPoint::updateNewmark(double dt) {
     mSolidPoint->updateNewmark(dt);
     mFluidPoint->updateNewmark(dt);

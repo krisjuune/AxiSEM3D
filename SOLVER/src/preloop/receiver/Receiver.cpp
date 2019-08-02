@@ -31,11 +31,14 @@ mName(name), mNetwork(network), mDepth(depth), mDumpStrain(dumpStrain), mDumpCur
     } else {
         rtpS(0) = 1.;
         if (cartesian) {
-          rtpS(1) = theta_lat * 1000 / Geodesy::getROuter();
+          RDCol3 xyz;
+          bool defined;
+          xyz << 1000 * theta_lat, 1000 * phi_lon, Geodesy::getROuter() - mDepth;
+          rtpS = Geodesy::toSpherical(xyz, defined);
         } else {
           rtpS(1) = theta_lat * degree;
+          rtpS(2) = phi_lon * degree;
         }
-        rtpS(2) = phi_lon * degree;
         rtpG = Geodesy::rotateSrc2Glob(rtpS, srcLat, srcLon, srcDep);
     }
     mTheta = rtpS(1);

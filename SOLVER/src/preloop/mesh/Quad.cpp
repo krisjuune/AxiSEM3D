@@ -360,10 +360,14 @@ void Quad::setupGLLPoints(std::vector<GLLPoint *> &gllPoints, const IMatPP &myPo
                     (mABCLowerSide == 1 && ipol == nPol) || 
                     (mABCLowerSide == 2 && jpol == nPol) ||
                     (mABCLowerSide == 3 && ipol == 0));
-                    
-                if (rbry & !lbry) {
+                
+                if (!rbry && !lbry && !mIsSpongeQuad) {
+                    continue;
+                }
+                
+                if (rbry && !lbry) {
                     computeNormalGeneral(ABCnormal, mABCRightSide, ipol, jpol, isCartesian);
-                } else if (lbry & !rbry) {
+                } else if (lbry) {
                     computeNormalGeneral(ABCnormal, mABCLowerSide, ipol, jpol, isCartesian);
                 }
                 
@@ -373,14 +377,33 @@ void Quad::setupGLLPoints(std::vector<GLLPoint *> &gllPoints, const IMatPP &myPo
                     double z_dist = std::abs(ABCPar->boundaries[1] - crds[1]);
                     double dist = std::min({s_dist,z_dist});
 
-                    if (rbry & s_dist > tinyDouble) {
+                    if (rbry && s_dist > tinyDouble) {
                         throw std::runtime_error("Quad::setupGLLPoints || Right ABC - mesh inconsistency.");
                     }
-                    if (lbry & z_dist > tinySingle) {
+                    if (lbry && z_dist > tinySingle) {
                         throw std::runtime_error("Quad::setupGLLPoints || Lower ABC - mesh inconsistency.");
                     }
-                    
-                    RDColX U0 = RDColX::Constant(mNr, 1, ABCPar->Ufac);
+                    RDColX U0;
+                    if (ABCPar->U_type == 0) {
+                        U0 = RDColX::Constant(mNr, 1, ABCPar->U);
+                    } else if (ABCPar->U_type == 1) {
+                        U0 = 2.2 * exp(-0.08 * ABCPar->width / (Vp3D.col(ipnt).array() * ABCPar->T)) 
+                                 * (Vs3D.col(ipnt).array() / Vp3D.col(ipnt).array())
+                                 * (Vs3D.col(ipnt).array() / Vp3D.col(ipnt).array())
+                                 / ABCPar->T;
+                    } else if (ABCPar->U_type == 2) {
+                        bool set = false;
+                        double Uz;
+                        for (int i = 0; i < ABCPar->Us.size(); i+=2) {
+                           if (crds[1] > ABCPar->depths[i]) {
+                               Uz = ABCPar->Us[i];
+                               set = true;
+                               break;
+                           }
+                        }
+                        if (set == false) Uz = ABCPar->Us.back();
+                        U0 = RDColX::Constant(mNr, 1, Uz);
+                    }
                     gamma = U0 * (1 - sin(pi * dist / (2 * ABCPar->width)) * sin(pi * dist / (2 * ABCPar->width)));
 
                     Vref_range[0]=std::min({Vref_range[0], Vp3D.col(ipnt).minCoeff()});
@@ -761,7 +784,7 @@ void Quad::computeNormalGeneral(RDMatX3 &normal, int side, int ipol, int jpol, b
     }
     
     RDMatX3 nRTZ(mPointNr(ipol, jpol), 3);
-    if (hasRelabelling() & normal_inplane(2) != 0) {
+    if (hasRelabelling() && normal_inplane(2) != 0) {
         nRTZ = mRelabelling->getSFNormalRTZ(ipol, jpol);
         if (normal_inplane(2) == -1) nRTZ *= -1;
     } else {
@@ -770,7 +793,7 @@ void Quad::computeNormalGeneral(RDMatX3 &normal, int side, int ipol, int jpol, b
         nRTZ.col(2).fill(normal_inplane(2));
     }
     
-    if (hasRelabelling() & normal_inplane(0) != 0) {
+    if (hasRelabelling() && normal_inplane(0) != 0) {
         nRTZ.col(0) *= mRelabelling->getStaceyNormalWeight(ipol, jpol, side);
     }
     
@@ -896,6 +919,14 @@ void Quad::getWFRweights(RDMatPP &interpFact) const {
     XMath::interpLagrange(0, nPntEdge,
         SpectralConstants::getP_GLL().data(), interpEta.data());
     interpFact = interpXi * interpEta.transpose();
+    if (mIsFluid) {
+        for (int ipol = 0; ipol <= nPol; ipol++) {
+            for (int jpol = 0; jpol <= nPol; jpol++) {
+                int ipnt = ipol * nPntEdge + jpol;
+                interpFact(ipol, jpol) /= mIntegralFactor(ipnt);    
+            }
+        }
+    }
 }
 
 int Quad::edgeAtRadius(double radius, double distTol, bool upper) const {

@@ -262,6 +262,7 @@ void ExodusModel::bcastRawData() {
     XMPI::bcastEigen(mNodalS);
     XMPI::bcastEigen(mNodalZ);
     XMPI::bcast(mDistTolerance);
+    XMPI::bcast(mHmax);
     
     XMPI::bcast(mElementalVariableNames_all);
     XMPI::bcast(mElementalVariableNames_elem);
@@ -339,7 +340,6 @@ void ExodusModel::formStructured() {
 
 void ExodusModel::formAuxiliary() {
 
-
     // rotate nodes of axial elements such that side 3 is on axis, side 1 is the right boundary and side 0 is the lower boundary
     MultilevelTimer::begin("Process Exodus Axis", 2);
     for (int axialQuad = 0; axialQuad < getNumQuads(); axialQuad++) {
@@ -368,7 +368,6 @@ void ExodusModel::formAuxiliary() {
     mInnerBoundaries = getBoundaries();
 
     if (mHasExtension) {
-        mN_ABC = ceil(round(10000 * mABCwidth / mHmax) / 10);
         AddAbsorbingBoundaryElements();
     }
     MultilevelTimer::end("Process Absorbing Boundaries", 2);
@@ -483,12 +482,16 @@ void ExodusModel::AddAbsorbingBoundaryElements() {
         }
     }
     
-    if (mN_ABC <= 0) {mN_ABC = round(6 * mTSource * mABC_Vmax / mHmax);}
-
+    // calculate number of boundary elements
+    if (mABCwidth < 0) {
+        mABCwidth = mN_maxWL_ABC * mTSource * mABC_Vmax / 1000;
+    }
+    mN_ABC = ceil(round(10000 * mABCwidth / mHmax) / 10);
+    
     // right boundary
     int nQuads = getNumQuads();
     int nNodes = getNumNodes();;
-
+    
     std::vector<int> rightBQuadTags;
     for (int tag = 0; tag < nQuads; tag++) {
         if (getSideRightB(tag) >= 0) {
@@ -713,13 +716,26 @@ void ExodusModel::buildInparam(ExodusModel *&exModel, const Parameters &par,
 
     if (par.getValue<bool>("ABC_LOW-ORDER_EXTENSION")) {
         exModel->mHasExtension = true;
-        exModel->mABCwidth = par.getValue<double>("ABC_LOW-ORDER_EXTENSION_WIDTH");
         exModel->mHasSpongeABC = false;
     } else {
         exModel->mHasSpongeABC = par.getValue<bool>("ABC_SPONGE_BOUNDARIES");
         exModel->mHasExtension = par.getValue<bool>("ABC_SPONGE_BOUNDARIES");
-        exModel->mABCwidth = par.getValue<double>("ABC_SPONGE_BOUNDARIES_WIDTH");
     }
+
+    if (exModel->mHasExtension) {
+        std::string mstr = par.getValue<std::string>("ABC_WIDTH");
+        std::vector<std::string> strs = Parameters::splitString(mstr, "$");
+        std::string format(strs[0]);
+        if (boost::iequals(format, "wavelengths")) {
+            exModel->mN_maxWL_ABC = boost::lexical_cast<int>(strs[1]);
+        } else if (boost::iequals(format, "distance")) {
+            exModel->mABCwidth = boost::lexical_cast<double>(strs[1]);
+        } else {
+            throw std::runtime_error("ExodusModel::buildInparam || "
+                "Unknown ABC extension format " + format + ".");
+        }
+    }
+
     exModel->mHasStaceyABC = par.getValue<bool>("ABC_STACEY_BOUNDARIES");
     exModel->mTSource = 2 * par.getValue<double>("SOURCE_STF_HALF_DURATION");
 

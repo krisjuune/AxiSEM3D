@@ -38,6 +38,9 @@ void Newmark::solve(int verbose) const {
     
     ////////////////////////// loop //////////////////////////
     for (int tstep = 1; tstep <= maxStep; tstep++) {
+        // Absorbing boundary
+        mDomain->applyABC();    
+        
         // update to next step
         mDomain->updateNewmark(dt);
         

@@ -73,6 +73,9 @@ public:
     // get displacement
     virtual const CMatX3 &getDispFourierSolid() const;
     virtual const CColX &getDispFourierFluid() const;
+    
+    
+    virtual void applyABC() = 0;
 
 protected:
     

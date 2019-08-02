@@ -234,6 +234,7 @@ void Volumetric3D_EMC::initialize(const std::vector<std::string> &params) {
     try {
         int ipar = 4;
         Parameters::castValue(mFactor, params.at(ipar++), source);
+        Parameters::castValue(mCartesian, params.at(ipar++), source);
         Parameters::castValue(mGeographic, params.at(ipar++), source);
         Parameters::castValue(mOneFilePerDepth, params.at(ipar++), source);
         Parameters::castValue(mVerticalDiscontinuities, params.at(ipar++), source);
@@ -241,6 +242,11 @@ void Volumetric3D_EMC::initialize(const std::vector<std::string> &params) {
         Parameters::castValue(mModelFlagFactor, params.at(ipar++), source);
     } catch (std::out_of_range) {
         // nothing
+    }
+    
+    if (mCartesian && mGeographic) {
+        throw std::runtime_error("Volumetric3D_EMC::initialize || "
+            "Cartesian model has to be source-centered.");
     }
     
     if (!boost::iequals(mModelFlag, "none")) {
@@ -261,28 +267,42 @@ bool Volumetric3D_EMC::get3dProperties(double r, double theta, double phi, doubl
     properties = std::vector<MaterialProperty>(1, mMaterialProp);
     refTypes = std::vector<MaterialRefType>(1, mReferenceType);
     values = std::vector<double>(1, 0.);
-        
-    // to geocentric
-    if (mGeographic) {
-        // which radius to use?
-        theta = pi / 2. - Geodesy::theta2Lat_d(theta, 0.) * degree;
-    }
     
-    // regularise
-    double dep = Geodesy::getROuter() - r;
-    double lat = 90. - theta / degree;
-    double lon = phi / degree;
-    XMath::checkLimits(dep, 0., Geodesy::getROuter());
-    XMath::checkLimits(lat, -90., 90.);
-    if (mGridLon[0] < 0.) {
-        // lon starts from -180.
-        if (lon > 180.) {
-            lon -= 360.;
-        }
-        XMath::checkLimits(lon, -180., 180.);
+    double dep, lat, lon;
+    if (mCartesian) {
+        RDCol3 rtp = RDCol3::Zero(3, 1);
+        rtp(0) = r;
+        rtp(1) = theta;
+        rtp(2) = phi;
+        RDCol3 xyz = Geodesy::toCartesian(rtp);
+        dep = Geodesy::getROuter() - xyz(0);
+        lat = xyz(1);
+        lon = xyz(2);
+        
+        XMath::checkLimits(dep, 0., Geodesy::getROuter());
     } else {
-        // lon starts from 0.
-        XMath::checkLimits(lon, 0., 360.);
+        // to geocentric
+        if (mGeographic) {
+            // which radius to use?
+            theta = pi / 2. - Geodesy::theta2Lat_d(theta, 0.) * degree;
+        }
+        
+        // regularise
+        dep = Geodesy::getROuter() - r;
+        lat = 90. - theta / degree;
+        lon = phi / degree;
+        XMath::checkLimits(dep, 0., Geodesy::getROuter());
+        XMath::checkLimits(lat, -90., 90.);
+        if (mGridLon[0] < 0.) {
+            // lon starts from -180.
+            if (lon > 180.) {
+                lon -= 360.;
+            }
+            XMath::checkLimits(lon, -180., 180.);
+        } else {
+            // lon starts from 0.
+            XMath::checkLimits(lon, 0., 360.);
+        }
     }
     
     // check center
@@ -339,6 +359,10 @@ bool Volumetric3D_EMC::get3dProperties(double r, double theta, double phi, doubl
 
 std::string Volumetric3D_EMC::verbose() const {
     std::stringstream ss;
+    std::string dim1str = mCartesian ? "XCoord" : "Latitude";
+    std::string dim2str = mCartesian ? "YCoord" : "Longitude";
+    std::string space1 = mCartesian ? "  " : "";
+    std::string space2 = mCartesian ? "   " : "";
     ss << "\n======================= 3D Volumetric =======================" << std::endl;
     ss << "  Model Name           =   EMC" << std::endl;
     ss << "  Data File            =   " << mFileName << std::endl;
@@ -346,11 +370,11 @@ std::string Volumetric3D_EMC::verbose() const {
     ss << "  Material Property    =   " << MaterialPropertyString[mMaterialProp] << std::endl;
     ss << "  Reference Type       =   " << MaterialRefTypeString[mReferenceType] << std::endl;
     ss << "  Num. Depths          =   " << mGridDep.size() << std::endl;
-    ss << "  Num. Latitudes       =   " << mGridLat.size() << std::endl;
-    ss << "  Num. Longitudes      =   " << mGridLon.size() << std::endl;
+    ss << "  Num. " << dim1str << "s" << space1 << "       =   " << mGridLat.size() << std::endl;
+    ss << "  Num. " << dim2str << "s" << space2 << "      =   " << mGridLon.size() << std::endl;
     ss << "  Depth Range          =   [" << mGridDep.minCoeff() << ", " << mGridDep.maxCoeff() << "]" << std::endl;
-    ss << "  Latitude Range       =   [" << mGridLat.minCoeff() << ", " << mGridLat.maxCoeff() << "]" << std::endl;
-    ss << "  Longitude Range      =   [" << mGridLon.minCoeff() << ", " << mGridLon.maxCoeff() << "]" << std::endl;
+    ss << "  " << dim1str << " Range" << space1 << "       =   [" << mGridLat.minCoeff() << ", " << mGridLat.maxCoeff() << "]" << std::endl;
+    ss << "  " << dim2str << " Range " << space2 << "     =   [" << mGridLon.minCoeff() << ", " << mGridLon.maxCoeff() << "]" << std::endl;
     ss << "  Factor               =   " << mFactor << std::endl;
     ss << "  Use Geographic       =   " << (mGeographic ? "YES" : "NO") << std::endl;
     ss << "  One File per Depth   =   " << (mOneFilePerDepth ? "YES" : "NO") << std::endl;

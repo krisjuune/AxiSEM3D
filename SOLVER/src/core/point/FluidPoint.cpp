@@ -28,9 +28,7 @@ void FluidPoint::updateNewmark(Real dt) {
       resetZero();
       return;
     }
-    
-    if (mABC) mStiff -= mABC->StaceyTraction(mVeloc);
-    
+
     // mask stiff
     maskField(mStiff);
       // compute accel inplace
@@ -41,9 +39,6 @@ void FluidPoint::updateNewmark(Real dt) {
     double half_dt = half * dt;
     double half_dt_dt = half_dt * dt;
     
-    // damp acceleration in sponge boundary
-    if (mABC) mABC->applyKosloffDamping(mStiff, mVeloc, mDispl);
-    
     // update velocity and old acceleration
     mVeloc += (Real)half_dt * (mAccel + mStiff);
     mAccel = mStiff;
@@ -52,6 +47,13 @@ void FluidPoint::updateNewmark(Real dt) {
 
     // zero stiffness for next time step
     mStiff.setZero();
+}
+
+void FluidPoint::applyABC() {
+    if (mABC) {
+        mStiff -= mABC->StaceyTraction(mVeloc);
+        mABC->applyKosloffDamping(mStiff, mVeloc, mDispl);
+    }
 }
 
 void FluidPoint::resetZero() {

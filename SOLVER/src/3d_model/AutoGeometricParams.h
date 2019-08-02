@@ -2,7 +2,6 @@
 // created by Claudia on 11-Oct-2018
 
 #include "eigenp.h"
-#include <iostream>
 
 class AutoGeometricParams {
 

@@ -71,7 +71,6 @@ public:
     bool isExtQuad(int quadTag) const {return (mABfield(quadTag, 1) > 0);};
     int getCopyTagAB(int quadTag) const {return mABfield(quadTag, 0);};
     int getABPosition(int quadTag) const {return mABfield(quadTag, 1);}; // 0 = edge of normal mesh; 1 = right ab boundary; 2 = lower ab boundary; 3 = ab corner
-    double getABVmax() const {return mABC_Vmax;};
 
     std::string verbose() const;
 
@@ -151,11 +150,13 @@ private:
 
     // for ABCs
     bool mHasSpongeABC, mHasStaceyABC, mHasExtension;
-    double mHmax, mHmin, mABCwidth, mTSource;
-    double mABC_Vmax = -1;
+    double mHmax, mHmin, mABC_Vmax, mTSource;
     int mN_ABC, mNumQuadsInner, mNumNodesInner;
     IMatX2 mABfield;
-
+    
+    double mABCwidth = -1;
+    int mN_maxWL_ABC = -1;
+    
     // for automated oceantopography
     double mMeshedOceanDepth = 0;
 };

@@ -11,20 +11,43 @@ class ExodusModel;
 class ABCParameters {
 
 public:
-    int n, absNu;
-    double Hmax, width, Ufac;
+    int n, U_type, absNu;
+    double Hmax, width, U, T;
     RDCol2 boundaries;
+    std::vector<double> depths;
+    std::vector<double> Us;
 
     ABCParameters(const Parameters &par, const ExodusModel *exModel) {
-    n = exModel->getNumAbsElements();
-    Ufac = par.getValue<double>("ABC_SPONGE_BOUNDARIES_FACTOR");
-    absNu = par.getValue<int>("ABC_LOW-ORDER_EXTENSION_ORDER");
-    Hmax = exModel->getHmax();
-    boundaries = exModel->getBoundaries();
 
-    double T = par.getValue<double>("SOURCE_STF_HALF_DURATION");
-    double v_max = exModel->getABVmax();
-    if (Ufac <= 0) {Ufac = 5 * 0.17 * (27 / pow(T, 0.45) + 27.82) / (n + 7);}
+    absNu = par.getValue<int>("ABC_LOW-ORDER_EXTENSION_ORDER");
+    T = 2 * par.getValue<double>("SOURCE_STF_HALF_DURATION");
+
+    Hmax = exModel->getHmax();
+    n = exModel->getNumAbsElements();
+    width = n * Hmax;
+    
+    boundaries = exModel->getBoundaries();
+    
+    std::string type = par.getValue<std::string>("ABC_SPONGE_BOUNDARIES_TYPE");
+    if (boost::iequals(type, "constant")) {
+        U_type = 0;
+        U = par.getValue<double>("ABC_SPONGE_BOUNDARIES_FACTOR");
+    } else if (boost::iequals(type, "empirical")) {
+        U_type = 1;
+    } else if (boost::iequals(type, "vertical_profile")) {
+        U_type = 2;
+        std::string mstr = par.getValue<std::string>("ABC_SPONGE_BOUNDARIES_FACTOR");
+        std::vector<std::string> strs = Parameters::splitString(mstr, "$");
+        for (int i = 0; i < strs.size(); i+=2) {
+            Us.push_back(boost::lexical_cast<double>(strs[i]));
+            if (strs.size() > i+1) {
+                depths.push_back(exModel->getROuter() - 1000 * boost::lexical_cast<double>(strs[i+1]));
+            }
+        }
+    } else {
+        throw std::runtime_error("ABCParameters::ABCParameters || "
+            "Unknown ABC absorbtion factor format " + type + ".");
+    }
 
     width = n * Hmax;
     };

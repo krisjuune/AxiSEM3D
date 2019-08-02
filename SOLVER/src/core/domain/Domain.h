@@ -68,6 +68,7 @@ public:
     // point operations
     void assembleStiff(int phase = 0) const; 
     void updateNewmark(double dt) const;
+    void applyABC() const;
     void coupleSolidFluid() const;
     
     // point-wise stations
