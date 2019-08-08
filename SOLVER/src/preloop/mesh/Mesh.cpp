@@ -113,7 +113,10 @@ void Mesh::buildUnweighted() {
     MultilevelTimer::begin("Plot at Unweighted Phase", 1);
     for (const auto &sp: mSlicePlots) sp->plotUnweighted();
     MultilevelTimer::end("Plot at Unweighted Phase", 1);
+    
     // print summary for absorbing boundaries
+    mU0_range(0) = XMPI::min(mU0_range(0));
+    mU0_range(1) = XMPI::max(mU0_range(1));
     XMPI::cout << ABC_verbose();
 }
 
@@ -567,8 +570,7 @@ std::string Mesh::ABC_verbose() const {
         ss << "    Total Normal Elem.   =   " << mExModel->getNumQuadsInner() << std::endl;
         if (mExModel->hasSpongeABC()) {
             ss << "    Extension Type       =   Kosloff&Kosloff Sponge Boundary" << std::endl;
-            ss << "      Att. Multiplier      =   " << mABCPar->U << std::endl;
-            ss << "      Reference Velocities =   " << mVref_range[0] << " ... " << mVref_range[1] << std::endl;
+            ss << "      Attenuation Type     =   " << mABCPar->s_type << std::endl;
             ss << "      Max. Attenuations    =   " << mU0_range[0] << " ... " << mU0_range[1] << std::endl;
         } else {
             ss << "    Extension Type       =   Low Order Extension" << std::endl;

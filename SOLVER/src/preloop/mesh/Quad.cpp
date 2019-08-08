@@ -387,10 +387,22 @@ void Quad::setupGLLPoints(std::vector<GLLPoint *> &gllPoints, const IMatPP &myPo
                     if (ABCPar->U_type == 0) {
                         U0 = RDColX::Constant(mNr, 1, ABCPar->U);
                     } else if (ABCPar->U_type == 1) {
-                        U0 = 2.2 * exp(-0.08 * ABCPar->width / (Vp3D.col(ipnt).array() * ABCPar->T)) 
-                                 * (Vs3D.col(ipnt).array() / Vp3D.col(ipnt).array())
-                                 * (Vs3D.col(ipnt).array() / Vp3D.col(ipnt).array())
-                                 / ABCPar->T;
+                        RDColX vs, vp;
+                        if (Vp3D.rows() > 1) {
+                            vp = Vp3D.col(ipnt);
+                            vs = Vs3D.col(ipnt);
+                        } else {
+                            vp = RDColX::Constant(mNr, 1, Vp3D(0, ipnt));
+                            vs = RDColX::Constant(mNr, 1, Vs3D(0, ipnt));
+                        }
+                        if (mIsFluid) {
+                            U0 = 1.76 * exp(-0.08 * ABCPar->width / (vp.array() * ABCPar->T)) 
+                                      / ABCPar->T;
+                        } else {
+                            U0 = 2.20 * exp(-0.08 * ABCPar->width / (vp.array() * ABCPar->T)) 
+                                      * (vs.array() / vp.array()) * (vs.array() / vp.array())
+                                      / ABCPar->T;
+                        }
                     } else if (ABCPar->U_type == 2) {
                         bool set = false;
                         double Uz;

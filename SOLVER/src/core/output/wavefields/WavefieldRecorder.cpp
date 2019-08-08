@@ -49,11 +49,11 @@ void WavefieldRecorder::initialize() {
 void WavefieldRecorder::record(Real t, const std::vector<Element *> elements) {
     if (t >= mT_record) {
         for (int iphi = 0; iphi < mNphi; iphi++) {
-            RDMatXX local_buffer = RDMatXX::Zero(elements.size(), 5);
+            RDMatXX local_buffer = RDMatXX::Zero(elements.size(), 6);
             int i = 0;
             for (const auto &elem: elements) {
-                local_buffer.block(i,0,1,2) = elem->getCenterCrds(mPhi[iphi]).transpose();
-                local_buffer.block(i,2,1,3) = elem->recordWF(mPhi[iphi]);
+                local_buffer.block(i,0,1,3) = elem->getCenterCrds(mPhi[iphi]).transpose();
+                local_buffer.block(i,3,1,3) = elem->recordWF(mPhi[iphi]);
                 i++;
             }
             std::stringstream ss;

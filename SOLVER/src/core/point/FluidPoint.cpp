@@ -52,7 +52,7 @@ void FluidPoint::updateNewmark(Real dt) {
 void FluidPoint::applyABC() {
     if (mABC) {
         mStiff -= mABC->StaceyTraction(mVeloc);
-        mABC->applyKosloffDamping(mStiff, mVeloc, mDispl);
+        mABC->applyKosloffDamping(mAccel, mVeloc, mDispl);
     }
 }
 

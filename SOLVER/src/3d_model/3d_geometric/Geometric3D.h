@@ -32,7 +32,7 @@ public:
     //    conversions from (theta, phi) to (lat, lon) has to be performed internally.
     // b) All models should be defined independently with respect to the perfect sphere.
     virtual double getDeltaR(double r, double theta, double phi, double rElemCenter) const = 0;
-    virtual bool isCartesian() {};
+    virtual bool isCartesian() const = 0;
 
     // verbose
     virtual std::string verbose() const = 0;

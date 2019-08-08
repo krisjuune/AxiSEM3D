@@ -137,9 +137,9 @@ RRow3 Element::recordWF(const double phi) const {
     return u_spz;
 }
 
-RDCol2 Element::getCenterCrds(const double phi) const {
-    RDCol2 crds;
+RDCol3 Element::getCenterCrds(const double phi) const {
+    RDCol3 crds;
     RDRowN dz = XMath::computeFourierAtPhi(mDz, phi);
-    crds << mCenterCrds(0), mCenterCrds(1) + dz(round((nPE-1)/2));
+    crds << mCenterCrds(0), mCenterCrds(1), dz(round((nPE-1)/2));
     return crds;
 }

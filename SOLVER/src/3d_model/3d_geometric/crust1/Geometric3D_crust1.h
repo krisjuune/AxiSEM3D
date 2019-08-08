@@ -17,7 +17,7 @@ public:
     double getDeltaR(double r, double theta, double phi, double rElemCenter) const;
     std::string verbose() const;
 
-    bool isCartesian() {return false;};
+    bool isCartesian() const {return false;};
 private:
     
     // model constants

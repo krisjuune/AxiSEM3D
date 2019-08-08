@@ -22,6 +22,10 @@ void ABC::setNormal(RMatX3 const normal) {
 }
 
 CMatX3 ABC::StaceyTraction(const CMatX3 veloc) const {
+    if (!mStacey) {
+        return CMatX3::Zero(mNu + 1, 3);
+    }
+    
     CMatX3 tractionC;
     if (mStacey3D) {
         CMatX3 &velocC = SolverFFTW_3::getC2R_CMat();
@@ -53,6 +57,10 @@ CMatX3 ABC::StaceyTraction(const CMatX3 veloc) const {
 }
 
 CColX ABC::StaceyTraction(const CColX veloc) const {
+    if (!mStacey) {
+        return CColX::Zero(mNu + 1, 1);
+    }
+    
     CColX tractionC;
     if (mStacey3D) {
         CColX &velocC = SolverFFTW_1::getC2R_CMat();
@@ -87,14 +95,14 @@ void ABC::applyKosloffDamping(CMatX3 &accel, const CMatX3 veloc, const CMatX3 di
         RMatX3 displR = SolverFFTW_3::getC2R_RMat();
         
         CMatX3 &velocC = SolverFFTW_3::getC2R_CMat();
-        velocC = veloc;
+        velocC.topRows(mNu + 1) = veloc;
         SolverFFTW_3::computeC2R(mNr);
         RMatX3 velocR = SolverFFTW_3::getC2R_RMat();
         
         RMatX3 &accelR = SolverFFTW_3::getR2C_RMat();
         
         CMatX3 &accelC = SolverFFTW_3::getC2R_CMat();
-        accelC = accel;
+        accelC.topRows(mNu + 1) = accel;
         SolverFFTW_3::computeC2R(mNr);
         accelR = SolverFFTW_3::getC2R_RMat();
 

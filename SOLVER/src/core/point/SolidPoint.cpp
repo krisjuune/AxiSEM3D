@@ -48,7 +48,7 @@ void SolidPoint::updateNewmark(Real dt) {
 void SolidPoint::applyABC() {
     if (mABC) {
         mStiff -= mABC->StaceyTraction(mVeloc);
-        mABC->applyKosloffDamping(mStiff, mVeloc, mDispl);
+        mABC->applyKosloffDamping(mAccel, mVeloc, mDispl);
     }
 }
 

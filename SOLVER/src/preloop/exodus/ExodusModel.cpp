@@ -179,7 +179,7 @@ void ExodusModel::readRawData() {
         mElementalVariableCoords_axis(j) = coords[j];
     }
     
-    // names of axial variables
+    // names of axial variables (remove index (0-3 for nodes) at the end of var name)
     for (int iname = 0; iname < mElementalVariableNames_all.size(); iname++) {
         std::string varName = mElementalVariableNames_all[iname];
         if (varName.substr(varName.length() - 2, 1) == std::string("_")) {
@@ -196,6 +196,7 @@ void ExodusModel::readRawData() {
     // elemental variables only on axis
     mElementalVariableValues_axis = RDMatXX::Zero(mElementalVariableCoords_axis.size(), 
         mElementalVariableNames_axis.size());
+    mABC_Vmax = -1;
     for (int iname = 0; iname < mElementalVariableNames_axis.size(); iname++) {
         std::string varName = mElementalVariableNames_axis[iname];
         if (std::find(mElementalVariableNames_all.begin(), mElementalVariableNames_all.end(), varName + "_0") 
@@ -231,6 +232,9 @@ void ExodusModel::readRawData() {
                     buffer(quad_nodes[idep].first);
             }
         }
+        if (varName.substr(0, 2) == "VP") {
+            mABC_Vmax = std::max(mABC_Vmax, mElementalVariableValues_axis.col(iname).maxCoeff());
+        }
     }            
     
     // element-wise
@@ -263,6 +267,7 @@ void ExodusModel::bcastRawData() {
     XMPI::bcastEigen(mNodalZ);
     XMPI::bcast(mDistTolerance);
     XMPI::bcast(mHmax);
+    XMPI::bcast(mABC_Vmax);
     
     XMPI::bcast(mElementalVariableNames_all);
     XMPI::bcast(mElementalVariableNames_elem);
@@ -469,25 +474,11 @@ void ExodusModel::formAuxiliary() {
 }
 
 void ExodusModel::AddAbsorbingBoundaryElements() {
-    for (int i = 0; i < mElementalVariableNames_axis.size(); i++) {
-        std::string vname = mElementalVariableNames_axis[i];
-        if (vname.substr(0, 2) == "VP") {
-            mABC_Vmax = std::max(mABC_Vmax, mElementalVariableValues_axis.col(i).maxCoeff());
-        }
-    }
-    for (int i = 0; i < mElementalVariableNames_elem.size(); i++) {
-        std::string vname = mElementalVariableNames_elem[i];
-        if (vname.substr(0, 2) == "VP") {
-            mABC_Vmax = std::max(mABC_Vmax, mElementalVariableValues_elem.col(i).maxCoeff());
-        }
-    }
-    
     // calculate number of boundary elements
     if (mABCwidth < 0) {
         mABCwidth = mN_maxWL_ABC * mTSource * mABC_Vmax / 1000;
     }
     mN_ABC = ceil(round(10000 * mABCwidth / mHmax) / 10);
-    
     // right boundary
     int nQuads = getNumQuads();
     int nNodes = getNumNodes();;

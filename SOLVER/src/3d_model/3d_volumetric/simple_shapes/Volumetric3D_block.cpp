@@ -198,9 +198,9 @@ std::string Volumetric3D_block::verbose() const {
     } else {
         ss << "  Value Inside                 =   " << mValueInside << std::endl;
     }
-    ss << "  X (km) or Lat or Theta (deg) =   " << mXyzCorner1(0) << " - " << mXyzCorner2(0) << std::endl;
-    ss << "  Y (km) or Lon or Phi (deg)   =   " << mXyzCorner1(1) << " - " << mXyzCorner2(1) << std::endl;
-    ss << "  Depth (km)                   =   " << mXyzCorner1(2) << " - " << mXyzCorner2(2) << std::endl;
+    ss << "  X (m) or Lat or Theta (deg) =   " << mXyzCorner1(0) << " - " << mXyzCorner2(0) << std::endl;
+    ss << "  Y (m) or Lon or Phi (deg)   =   " << mXyzCorner1(1) << " - " << mXyzCorner2(1) << std::endl;
+    ss << "  Depth (m)                   =   " << mXyzCorner1(2) << " - " << mXyzCorner2(2) << std::endl;
     ss << "  Cartesian                    =   " << (mCartesian ? "YES" : "NO") << std::endl;
     ss << "  Source-centered              =   " << (mSourceCentered ? "YES" : "NO") << std::endl;
     ss << "  HWHM / km                    =   " << mHWHM / 1e3 << std::endl;

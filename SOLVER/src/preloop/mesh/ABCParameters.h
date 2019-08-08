@@ -16,6 +16,7 @@ public:
     RDCol2 boundaries;
     std::vector<double> depths;
     std::vector<double> Us;
+    std::string s_type;
 
     ABCParameters(const Parameters &par, const ExodusModel *exModel) {
 
@@ -28,13 +29,13 @@ public:
     
     boundaries = exModel->getBoundaries();
     
-    std::string type = par.getValue<std::string>("ABC_SPONGE_BOUNDARIES_TYPE");
-    if (boost::iequals(type, "constant")) {
+    s_type = par.getValue<std::string>("ABC_SPONGE_BOUNDARIES_TYPE");
+    if (boost::iequals(s_type, "constant")) {
         U_type = 0;
         U = par.getValue<double>("ABC_SPONGE_BOUNDARIES_FACTOR");
-    } else if (boost::iequals(type, "empirical")) {
+    } else if (boost::iequals(s_type, "empirical")) {
         U_type = 1;
-    } else if (boost::iequals(type, "vertical_profile")) {
+    } else if (boost::iequals(s_type, "vertical_profile")) {
         U_type = 2;
         std::string mstr = par.getValue<std::string>("ABC_SPONGE_BOUNDARIES_FACTOR");
         std::vector<std::string> strs = Parameters::splitString(mstr, "$");
@@ -46,7 +47,7 @@ public:
         }
     } else {
         throw std::runtime_error("ABCParameters::ABCParameters || "
-            "Unknown ABC absorbtion factor format " + type + ".");
+            "Unknown ABC absorbtion factor format " + s_type + ".");
     }
 
     width = n * Hmax;

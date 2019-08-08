@@ -55,9 +55,7 @@ void Geometric3D_EMC::initialize() {
     mGridLon = flon.cast<double>();
     mGridData = fdata.cast<double>();
 
-    if (mCartesian) {
-        mGridData = RDMatXX::Constant(mGridData.rows(), mGridData.cols(), 6371e3) - mGridData;
-    } else {
+    if (!mCartesian) {
         // to SI
         mGridData *= 1e3;
     }

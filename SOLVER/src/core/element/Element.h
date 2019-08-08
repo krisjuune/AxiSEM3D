@@ -74,7 +74,7 @@ public:
         mDz = dz;
     }
     RRow3 recordWF(const double phi) const;
-    RDCol2 getCenterCrds(const double phi) const;
+    RDCol3 getCenterCrds(const double phi) const;
 
 protected:
     int mMaxNu;
