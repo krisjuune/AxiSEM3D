@@ -17,7 +17,8 @@ class ReceiverCollection {
 public:
     ReceiverCollection(const std::string &fileRec, bool geographic, 
         double srcLat, double srcLon, double srcDep, int duplicated, 
-        double saveSurfRadius, bool saveSurfUpper, bool cartesian);
+        double saveSurfRadius, double saveSurfDistMin, double saveSurfDistMax, 
+        bool saveSurfUpper, bool cartesian);
     ~ReceiverCollection();
     
     void release(Domain &domain, const Mesh &mesh, bool depthInRef); 
@@ -52,6 +53,8 @@ private:
     
     // surface wavefield
     double mSaveSurfaceAtRadius = -1.;
+    double mSaveSurfaceDistMin = 0.;
+    double mSaveSurfaceDistMax = 180.;
     bool mSaveSurfaceFromUpper = false;
     bool mAssemble = true;
     
