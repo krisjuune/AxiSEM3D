@@ -372,7 +372,7 @@ void ExodusModel::formAuxiliary() {
     mNumNodesInner = getNumNodes();
     mInnerBoundaries = getBoundaries();
 
-    if (mHasExtension) {
+    if (mHasSpongeABC) {
         AddAbsorbingBoundaryElements();
     }
     MultilevelTimer::end("Process Absorbing Boundaries", 2);
@@ -636,7 +636,7 @@ std::string ExodusModel::verbose() const {
     ss << "    " << std::setw(width) << "..." << std::endl;
     ss << "    " << std::setw(width) << mNumNodesInner - 1 << ": ";
     ss << std::setw(13) << mNodalS(mNumNodesInner - 1) << std::setw(13) << mNodalZ(mNumNodesInner - 1) << std::endl;
-    if (hasExtension()) {
+    if (mHasSpongeABC) {
         ss << "    " << std::setw(width) << "..." << std::endl;
         ss << "    " << std::setw(width) << "extended boundary ends at" << std::endl;
         ss << "    " << std::setw(width) << getNumNodes() << ": ";
@@ -676,7 +676,7 @@ std::string ExodusModel::verbose() const {
             pair += (int)(it->second(q) >= 0);
         }
         ss << pair;
-        if (hasExtension()) {
+        if (mHasSpongeABC) {
             pair = 0;
             for (int q = mNumQuadsInner; q < getNumQuads(); q++) {
                 pair += (int)(it->second(q) >= 0);
@@ -705,16 +705,10 @@ void ExodusModel::buildInparam(ExodusModel *&exModel, const Parameters &par,
     exfile = Parameters::sInputDirectory + "/" + exfile;
     exModel = new ExodusModel(exfile);
 
-    if (par.getValue<bool>("ABC_LOW-ORDER_EXTENSION")) {
-        exModel->mHasExtension = true;
-        exModel->mHasSpongeABC = false;
-    } else {
-        exModel->mHasSpongeABC = par.getValue<bool>("ABC_SPONGE_BOUNDARIES");
-        exModel->mHasExtension = par.getValue<bool>("ABC_SPONGE_BOUNDARIES");
-    }
+    exModel->mHasSpongeABC = par.getValue<bool>("ABC_SPONGE_BOUNDARIES");
 
-    if (exModel->mHasExtension) {
-        std::string mstr = par.getValue<std::string>("ABC_WIDTH");
+    if (exModel->mHasSpongeABC) {
+        std::string mstr = par.getValue<std::string>("ABC_SPONGE_BOUNDARIES_WIDTH");
         std::vector<std::string> strs = Parameters::splitString(mstr, "$");
         std::string format(strs[0]);
         if (boost::iequals(format, "wavelengths")) {

@@ -23,11 +23,6 @@ public:
         
     bool useLuckyNumber() const {return mUseLuckyNumber;};
     
-private:
-    static RDCol2 mInnerBoundaries;
-    static int mExtNu;
-    static bool mHasLowOrderExt;
-    
 protected:
     bool mUseLuckyNumber;
 };

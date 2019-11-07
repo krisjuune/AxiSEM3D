@@ -562,27 +562,21 @@ void Mesh::test() {
 std::string Mesh::ABC_verbose() const {
     std::stringstream ss;
     ss << "\n=================== Absorbing Boundaries ===================" << std::endl;
-    if (mExModel->hasExtension()) {
-        ss << "  Mesh Extension at Boundary___________________________" << std::endl;
-        ss << "    Mesh Extended by     =   " << mABCPar->n << std::endl;
+    if (mExModel->hasSpongeABC()) {
+        ss << "  Sponge Boundary with Mesh Extension_______________________" << std::endl;
+        ss << "    Absorbing Layers     =   " << mABCPar->n << std::endl;
         ss << "    Boundary Width (km)  =   " << mABCPar->width / 1000 << std::endl;
         ss << "    Total Boundary Elem. =   " << mExModel->getNumQuads() - mExModel->getNumQuadsInner() << std::endl;
         ss << "    Total Normal Elem.   =   " << mExModel->getNumQuadsInner() << std::endl;
-        if (mExModel->hasSpongeABC()) {
-            ss << "    Extension Type       =   Kosloff&Kosloff Sponge Boundary" << std::endl;
-            ss << "      Attenuation Type     =   " << mABCPar->s_type << std::endl;
-            ss << "      Max. Attenuations    =   " << mU0_range[0] << " ... " << mU0_range[1] << std::endl;
-        } else {
-            ss << "    Extension Type       =   Low Order Extension" << std::endl;
-            ss << "      Extension Order      =   " << mABCPar->absNu << std::endl;
-        }
+        ss << "    Attenuation Type     =   " << mABCPar->s_type << std::endl;
+        ss << "    Max. Attenuations    =   " << mU0_range[0] << " ... " << mU0_range[1] << std::endl;
     } else {
-        ss << "  No Mesh Extension." << std::endl;
+        ss << "  No Sponge Boundary." << std::endl;
     }
     if (mExModel->hasStaceyABC()) {
-        ss << "  Stacey Absorbing Boundary Condition is turned on." << std::endl;
+        ss << "  Stacey Absorbing Boundary Condition is turned ON." << std::endl;
     } else {
-        ss << "  Stacey Absorbing Boundary Condition is turned off." << std::endl;
+        ss << "  Stacey Absorbing Boundary Condition is turned OFF." << std::endl;
     }
     ss << "=================== Absorbing Boundaries ===================\n" << std::endl;
     return ss.str();

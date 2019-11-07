@@ -11,7 +11,7 @@ class ExodusModel;
 class ABCParameters {
 
 public:
-    int n, U_type, absNu;
+    int n, U_type;
     double Hmax, width, U, T;
     RDCol2 boundaries;
     std::vector<double> depths;
@@ -20,7 +20,6 @@ public:
 
     ABCParameters(const Parameters &par, const ExodusModel *exModel) {
 
-    absNu = par.getValue<int>("ABC_LOW-ORDER_EXTENSION_ORDER");
     T = 2 * par.getValue<double>("SOURCE_STF_HALF_DURATION");
 
     Hmax = exModel->getHmax();

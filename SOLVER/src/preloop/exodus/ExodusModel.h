@@ -35,7 +35,6 @@ public:
     bool isCartesian() const {return mGlobalRecords.at("crdsys") != "spherical";};
     bool hasStaceyABC() const {return (isCartesian() && mHasStaceyABC);}
     bool hasSpongeABC() const {return (isCartesian() && mHasSpongeABC);}
-    bool hasExtension() const {return (isCartesian() && mHasExtension);}
     double getDistTolerance() const {return mDistTolerance;};
     double getHmax() const {return mHmax;};
     double getHmin() const {return mHmin;};
@@ -149,7 +148,7 @@ private:
     RDCol2 mInnerBoundaries;
 
     // for ABCs
-    bool mHasSpongeABC, mHasStaceyABC, mHasExtension;
+    bool mHasSpongeABC, mHasStaceyABC;
     double mHmax, mHmin, mABC_Vmax, mTSource;
     int mN_ABC, mNumQuadsInner, mNumNodesInner;
     IMatX2 mABfield;

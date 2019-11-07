@@ -76,9 +76,9 @@ void Volumetric3D_SEG::initialize(const std::vector<std::string> &params) {
         //         "Error opening SEG_C3NA.crd0 data files at directory: ||" + path);
         // }
         std::cout << "Volumetric3D_SEG::initialize || reading xyz.." << std::endl;
-        std::vector<double> X = readDoubleArray(path + "/SEG_C3NA_small.crdx");
-        std::vector<double> Y = readDoubleArray(path + "/SEG_C3NA_small.crdy");
-        std::vector<double> Z = readDoubleArray(path + "/SEG_C3NA_small.crdz");
+        std::vector<double> X = readDoubleArray(path + "/SEG_C3NA.crdx");
+        std::vector<double> Y = readDoubleArray(path + "/SEG_C3NA.crdy");
+        std::vector<double> Z = readDoubleArray(path + "/SEG_C3NA.crdz");
 
         mNx = X.size();
         mNy = Y.size();
@@ -126,17 +126,17 @@ void Volumetric3D_SEG::initialize(const std::vector<std::string> &params) {
 
     if (XMPI::rank() == vp_mpirank) {
         std::cout << "Volumetric3D_SEG::initialize || reading vp.." << std::endl;
-        readDoubleMat(path + "/SEG_C3NA_small.vp", mNz, mVp);
+        readDoubleMat(path + "/SEG_C3NA.vp", mNz, mVp);
     }
 
     if (XMPI::rank() == vs_mpirank) {
         std::cout << "Volumetric3D_SEG::initialize || reading vs.." << std::endl;
-        readDoubleMat(path + "/SEG_C3NA_small.vs", mNz, mVs);
+        readDoubleMat(path + "/SEG_C3NA.vs", mNz, mVs);
     }
 
     if (XMPI::rank() == rho_mpirank) {
         std::cout << "Volumetric3D_SEG::initialize || reading rho.." << std::endl;
-        readDoubleMat(path + "/SEG_C3NA_small.rho", mNz, mRho);
+        readDoubleMat(path + "/SEG_C3NA.rho", mNz, mRho);
     }
 
     XMPI::cout << "Volumetric3D_SEG::initialize || broadcasting vp.." << XMPI::endl;
@@ -235,8 +235,8 @@ bool Volumetric3D_SEG::get3dProperties(double r, double theta, double phi, doubl
     properties.push_back(Volumetric3D::MaterialProperty::VP);
     properties.push_back(Volumetric3D::MaterialProperty::VS);
     properties.push_back(Volumetric3D::MaterialProperty::RHO);
-    refTypes = std::vector<MaterialRefType>(1, Volumetric3D::MaterialRefType::Absolute);
-    double value;
+    refTypes = std::vector<MaterialRefType>(3, Volumetric3D::MaterialRefType::Absolute);
+    values = std::vector<double>(3, 0.);
 
     // allowing 1 cm error in grid points
     double tol = 0.01;
@@ -403,9 +403,9 @@ bool Volumetric3D_SEG::get3dProperties(double r, double theta, double phi, doubl
             throw std::runtime_error("Volumetric3D_SEG::get3dProperties || Check 3D model: found vs larger than vp.");
     }
 
-    values.push_back(vp_interp);
-    values.push_back(vs_interp);
-    values.push_back(rho_interp);
+    values[0] = vp_interp;
+    values[1] = vs_interp;
+    values[2] = rho_interp;
     return true;
 }
 

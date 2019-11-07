@@ -52,8 +52,8 @@ void WavefieldRecorder::record(Real t, const std::vector<Element *> elements) {
             RDMatXX local_buffer = RDMatXX::Zero(elements.size(), 6);
             int i = 0;
             for (const auto &elem: elements) {
-                local_buffer.block(i,0,1,3) = elem->getCenterCrds(mPhi[iphi]).transpose();
-                local_buffer.block(i,3,1,3) = elem->recordWF(mPhi[iphi]);
+                local_buffer.block(i,0,1,3) = elem->getCenterCrds(degree * mPhi[iphi]).transpose();
+                local_buffer.block(i,3,1,3) = elem->recordWF(degree * mPhi[iphi]);
                 i++;
             }
             std::stringstream ss;

@@ -18,6 +18,9 @@ mHalfDuration(hdur), mDecay(decay) {
         double t = -mShift + i * mDeltaT;
         mSTF.push_back(2. * pow(mDecay / mHalfDuration, 2.) * exp(-pow((mDecay / mHalfDuration * t), 2.)) 
             * (2. * pow(t, 2.) * pow(mDecay / mHalfDuration, 2.) - 1.));
+        //mSTF.push_back(exp(-pow((mDecay / mHalfDuration * t), 2.)) 
+        //    * pow(mDecay / mHalfDuration, 3.) / sqrt(pi)
+        //    * (2. * pow((mDecay / mHalfDuration * t), 2.)) - 1.);
     }
 }
 

@@ -38,13 +38,11 @@ void Parameters::registerAll() {
     registerPar("MODEL_PLOT_SLICES_NUM");
     registerPar("MODEL_PLOT_SLICES_LIST");
     registerPar("ATTENUATION");
+    registerPar("ABC_STACEY_BOUNDARIES");
     registerPar("ABC_SPONGE_BOUNDARIES");
+    registerPar("ABC_SPONGE_BOUNDARIES_WIDTH");
     registerPar("ABC_SPONGE_BOUNDARIES_TYPE");
     registerPar("ABC_SPONGE_BOUNDARIES_FACTOR");
-    registerPar("ABC_LOW-ORDER_EXTENSION");
-    registerPar("ABC_LOW-ORDER_EXTENSION_ORDER");
-    registerPar("ABC_WIDTH");
-    registerPar("ABC_STACEY_BOUNDARIES");
 
     // inparam.nu
     registerPar("NU_TYPE");

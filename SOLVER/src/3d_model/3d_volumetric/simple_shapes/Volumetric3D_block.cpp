@@ -106,18 +106,18 @@ void Volumetric3D_block::initialize(const std::vector<std::string> &params) {
     } else {
         xyzCorner1(0) = 1e3 * mX1;
         xyzCorner1(1) = 1e3 * mY1;
-        xyzCorner1(2) = 1e3 * mZ1;
+        xyzCorner1(2) = mZ1;
         
         xyzCorner2(0) = 1e3 * mX2;
         xyzCorner2(1) = 1e3 * mY2;
-        xyzCorner2(2) = 1e3 * mZ2;
+        xyzCorner2(2) = mZ2;
     }
     mX1 = std::min({xyzCorner1(0), xyzCorner2(0)});
     mX2 = std::max({xyzCorner1(0), xyzCorner2(0)});
     mY1 = std::min({xyzCorner1(1), xyzCorner2(1)});
     mY2 = std::max({xyzCorner1(1), xyzCorner2(1)});
-    mZ1 = std::min({xyzCorner1(2), xyzCorner2(2)});
-    mZ2 = std::max({xyzCorner1(2), xyzCorner2(2)});
+    mZ1 = Geodesy::getROuter() - std::min({xyzCorner1(2), xyzCorner2(2)});
+    mZ2 = Geodesy::getROuter() - std::max({xyzCorner1(2), xyzCorner2(2)});
     
     // use 20% of radius for HWHM if not specified
     if (mHWHM < 0.) {
@@ -150,9 +150,9 @@ bool Volumetric3D_block::get3dProperties(double r, double theta, double phi, dou
     rtpTarget(2) = phi;
     const RDCol3 &xyzTarget = Geodesy::toCartesian(rtpTarget);
     
-    bool insideX = (mX1 <= xyzTarget(0) && xyzTarget(0) <= mX2);
-    bool insideY = (mY1 <= xyzTarget(1) && xyzTarget(1) <= mY2);
-    bool insideZ = (mZ1 <= xyzTarget(2) && xyzTarget(2) <= mZ2);
+    bool insideX = (mX1 <= xyzTarget(0) & xyzTarget(0) <= mX2);
+    bool insideY = (mY1 <= xyzTarget(1) & xyzTarget(1) <= mY2);
+    bool insideZ = (mZ1 >= xyzTarget(2) & xyzTarget(2) >= mZ2);
     
     double dx, dy, dz;
     if (insideX) {
@@ -172,15 +172,17 @@ bool Volumetric3D_block::get3dProperties(double r, double theta, double phi, dou
     }
     
     double distance = std::sqrt(dx*dx + dy*dy + dz*dz);
+    double stddev = mHWHM / sqrt(2. * log(2.));
     
     // outside range
+    double gaussian;
     if (distance > 4. * mHWHM) {
         return false;
+    } else if (distance > 0) {
+        gaussian = mValueInside * exp(-distance * distance / (stddev * stddev * 2.));
+    } else {
+        gaussian = mValueInside;
     }
-    
-    // compute Gaussian
-    double stddev = mHWHM / sqrt(2. * log(2.));
-    double gaussian = mValueInside * exp(-distance * distance / (stddev * stddev * 2.));
     
     // set perturbations    
     values[0] = gaussian;
@@ -198,9 +200,9 @@ std::string Volumetric3D_block::verbose() const {
     } else {
         ss << "  Value Inside                 =   " << mValueInside << std::endl;
     }
-    ss << "  X (m) or Lat or Theta (deg) =   " << mXyzCorner1(0) << " - " << mXyzCorner2(0) << std::endl;
-    ss << "  Y (m) or Lon or Phi (deg)   =   " << mXyzCorner1(1) << " - " << mXyzCorner2(1) << std::endl;
-    ss << "  Depth (m)                   =   " << mXyzCorner1(2) << " - " << mXyzCorner2(2) << std::endl;
+    ss << "  X (km) or Lat or Theta (deg) =   " << mXyzCorner1(0) << " - " << mXyzCorner2(0) << std::endl;
+    ss << "  Y (km) or Lon or Phi (deg)   =   " << mXyzCorner1(1) << " - " << mXyzCorner2(1) << std::endl;
+    ss << "  Depth (km)                   =   " << mXyzCorner1(2) * 1e-3 << " - " << mXyzCorner2(2) * 1e-3 << std::endl;
     ss << "  Cartesian                    =   " << (mCartesian ? "YES" : "NO") << std::endl;
     ss << "  Source-centered              =   " << (mSourceCentered ? "YES" : "NO") << std::endl;
     ss << "  HWHM / km                    =   " << mHWHM / 1e3 << std::endl;
