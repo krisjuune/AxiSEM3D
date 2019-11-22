@@ -14,7 +14,7 @@ FluidPoint::FluidPoint(int nr, bool axial, const RDCol2 &crds, Mass *mass, const
     mAccel = CColX::Zero(mNu + 1, 1);
     mStiff = CColX::Zero(mNu + 1, 1);
     mMass->checkCompatibility(nr);
-    mNuWisdom = mNu;
+    //mNuWisdom = mNu;
 }
 
 FluidPoint::~FluidPoint() {
@@ -223,27 +223,70 @@ void FluidPoint::maskField(CColX &field) {
         field(mNu) = czero;
     }
 }
-
-void FluidPoint::learnWisdom(Real cutoff) {
-    // L2 norm
-    Real L2norm = mDispl.squaredNorm();
-    // Hilbert norm
-    Real h2norm = L2norm - .5 * mDispl.row(0).squaredNorm();
-    if (h2norm <= mMaxDisplWisdom) {
-        return;
-    }
-    mMaxDisplWisdom = h2norm;
-    
-    // try smaller orders
-    Real tol = h2norm * cutoff * cutoff;
-    for (int newNu = 0; newNu < mNu; newNu++) {
-        Real diff = L2norm - mDispl.topRows(newNu + 1).squaredNorm();
-        if (diff <= tol) {
-            mNuWisdom = newNu;
+#include<iostream>
+void FluidPoint::learnWisdom(Real cutoff, int nPeaks) {
+    // using only maximum of displacement
+    if (nPeaks == 0) {
+        // L2 norm
+        Real L2norm = mDispl.squaredNorm();
+        // Hilbert norm
+        Real h2norm = L2norm - .5 * mDispl.row(0).squaredNorm();
+        if (h2norm <= mLastMaxDisplWisdom) {
             return;
         }
+        mLastMaxDisplWisdom = h2norm;
+        // try smaller orders
+        Real tol = h2norm * cutoff * cutoff;
+        for (int newNu = 0; newNu < mNu; newNu++) {
+            Real diff = L2norm - mDispl.topRows(newNu + 1).squaredNorm();
+            if (diff <= tol) {
+                mNuWisdom = newNu;
+                return;
+            }
+        }
+        mNuWisdom = mNu;
+    
+    // using N peaks of displacement
+    } else {
+    
+        if (mPeaksWisdom >= nPeaks) {
+            return;
+        }
+        // L2 norm
+        Real L2norm = mDispl.squaredNorm();
+        // Hilbert norm
+        Real h2norm = L2norm - .5 * mDispl.row(0).squaredNorm();
+    
+        if (h2norm <= mLastMaxDisplWisdom) {
+            if (mApproachingPeak) {
+                // try smaller orders
+                Real tol = mLastMaxDisplWisdom * cutoff * cutoff;
+                bool found = false;
+                for (int newNu = 0; newNu < mNu; newNu++) {
+                    Real diff = mLastDisplWisdom.squaredNorm() - mLastDisplWisdom.topRows(newNu + 1).squaredNorm();
+                    if (diff <= tol) {
+                        mNuWisdom = std::max({newNu, mNuWisdom});
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    mNuWisdom = mNu;
+                }
+                //std::cout << mLastMaxDisplWisdom << " -> " << h2norm << "; " << mNu << " -> " << mNuWisdom;
+                // reset peak-search 
+                mLastMaxDisplWisdom = 0;
+                mApproachingPeak = false;    
+                mPeaksWisdom += 1;
+            }
+            //std::cout << std::endl;
+        } else {
+            
+            mApproachingPeak = (mLastMaxDisplWisdom > tinyDouble);
+            mLastDisplWisdom = mDispl;
+            mLastMaxDisplWisdom = h2norm;
+        }
     }
-    mNuWisdom = mNu;
 }
 
 

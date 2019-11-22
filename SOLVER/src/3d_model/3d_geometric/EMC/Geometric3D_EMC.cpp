@@ -16,6 +16,8 @@ void Geometric3D_EMC::initialize() {
     // EMC is in float
     Eigen::Matrix<float, Eigen::Dynamic, 1> flat, flon;
     Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic> fdata;
+    std::string latStr = mCartesian ? "x" : "latitude";
+    std::string lonStr = mCartesian ? "y" : "longitude";
     
     // read file
     if (XMPI::root()) {
@@ -23,15 +25,15 @@ void Geometric3D_EMC::initialize() {
         if (NetCDF_Reader::checkNetCDF_isAscii(fname)) {
             NetCDF_ReaderAscii reader;
             reader.open(fname);
-            reader.read1D("latitude", flat);
-            reader.read1D("longitude", flon);
+            reader.read1D(latStr, flat);
+            reader.read1D(lonStr, flon);
             reader.read2D(mVarName, fdata);
             reader.close();
         } else {
             NetCDF_Reader reader;
             reader.open(fname);
-            reader.read1D("latitude", flat);
-            reader.read1D("longitude", flon);
+            reader.read1D(latStr, flat);
+            reader.read1D(lonStr, flon);
             reader.read2D(mVarName, fdata);
             reader.close();
         }
@@ -106,14 +108,14 @@ void Geometric3D_EMC::initialize(const std::vector<std::string> &params) {
         // nothing
     }
 
+    mRLayer *= 1e3;
+    mRLower *= 1e3;
+    mRUpper *= 1e3;
+
     if (mCartesian) {
         mRLayer = 6371e3 - mRLayer;
         mRLower = 6371e3 - mRLower;
         mRUpper = 6371e3 - mRUpper;
-    } else {
-        mRLayer *= 1e3;
-        mRLower *= 1e3;
-        mRUpper *= 1e3;
     }
 
     initialize();
@@ -200,7 +202,7 @@ std::string Geometric3D_EMC::verbose() const {
     ss << "  Model Name          =   EMC" << mVerboseOcean << std::endl;
     if (mCartesian) {
         ss << "  Layer Depth (m)     =   " << 6371e3 - mRLayer << std::endl;
-        ss << "  Depth Range (m)     =   [" << 6371e3 - mRLower << ", " << 6371e3 - mRUpper << "]" << std::endl;
+        ss << "  Depth Range (m)     =   [" << 6371e3 - mRUpper << ", " << 6371e3 - mRLower << "]" << std::endl;
         ss << "  X Coords Range (km) =   [" << mGridLat.minCoeff() / 1e3 << ", " << mGridLat.maxCoeff() / 1e3 << "]" << std::endl;
         ss << "  Y Coords Range (km) =   [" << mGridLon.minCoeff() / 1e3 << ", " << mGridLon.maxCoeff() / 1e3 << "]" << std::endl;
         ss << "  Data Range (m)      =   [" << mGridData.minCoeff() << ", " << mGridData.maxCoeff() << "]" << std::endl;

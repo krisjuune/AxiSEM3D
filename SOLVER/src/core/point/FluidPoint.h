@@ -55,7 +55,7 @@ public:
     void addToStiff(const CMatX3 &source);
 
     // wisdom
-    void learnWisdom(Real cutoff);
+    void learnWisdom(Real cutoff, int nPeaks);
     int getNuWisdom() const {return mNuWisdom;};
     
     // get displacement
@@ -81,8 +81,11 @@ private:
     ABC *mABC = 0;
 
     // wisdom
-    Real mMaxDisplWisdom = -1.;
+    CColX mLastDisplWisdom = CColX::Zero(mNu + 1, 1);
+    Real mLastMaxDisplWisdom = -1.;
     int mNuWisdom = 0;
+    int mPeaksWisdom = 0;
+    bool mApproachingPeak = true;
 
     bool mFluidSurf = false;
 };

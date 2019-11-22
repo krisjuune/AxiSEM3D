@@ -414,7 +414,7 @@ void Domain::learnWisdom(int tstep) const {
     
     if (tstep % mLearnPar->mInterval == 0) {
         for (const auto &point: mPoints) {
-            point->learnWisdom(mLearnPar->mCutoff);
+            point->learnWisdom(mLearnPar->mCutoff, mLearnPar->mNPeaks);
         }
     }
     

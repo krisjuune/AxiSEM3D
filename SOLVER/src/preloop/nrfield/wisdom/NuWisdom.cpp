@@ -133,6 +133,7 @@ std::vector<RTreeValue> NuWisdom::queryKNN(const RTreePoint &target, int number)
 
 LearnParameters::LearnParameters(const Parameters &par) {
     mInvoked = par.getValue<bool>("NU_WISDOM_LEARN");
+    mNPeaks = par.getValue<int>("NU_WISDOM_LEARN_PEAKS");
     mCutoff = par.getValue<double>("NU_WISDOM_LEARN_EPSILON");
     if (mCutoff > .1) {
         mCutoff = .1;

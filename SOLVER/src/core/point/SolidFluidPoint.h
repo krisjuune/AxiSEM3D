@@ -60,7 +60,7 @@ public:
     void applyABC();
     
     // wisdom
-    void learnWisdom(Real cutoff);
+    void learnWisdom(Real cutoff, int nPeaks);
     int getNuWisdom() const;
     
     // get displacement

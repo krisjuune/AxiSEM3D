@@ -127,9 +127,9 @@ double SolidFluidPoint::measureCoupling(int count) {
     return elapsed_time / count;
 }
 
-void SolidFluidPoint::learnWisdom(Real cutoff) {
-    mSolidPoint->learnWisdom(cutoff);
-    mFluidPoint->learnWisdom(cutoff);
+void SolidFluidPoint::learnWisdom(Real cutoff, int nPeaks) {
+    mSolidPoint->learnWisdom(cutoff, nPeaks);
+    mFluidPoint->learnWisdom(cutoff, nPeaks);
 }
 
 int SolidFluidPoint::getNuWisdom() const {

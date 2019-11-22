@@ -60,6 +60,7 @@ void Parameters::registerAll() {
     registerPar("NU_EMP_DEPTH_START");
     registerPar("NU_EMP_DEPTH_END");
     registerPar("NU_WISDOM_LEARN");
+    registerPar("NU_WISDOM_LEARN_PEAKS");
     registerPar("NU_WISDOM_LEARN_EPSILON");
     registerPar("NU_WISDOM_LEARN_INTERVAL");
     registerPar("NU_WISDOM_LEARN_OUTPUT");

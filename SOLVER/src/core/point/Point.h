@@ -64,7 +64,7 @@ public:
     const RDCol2 &getCoords() const {return mCoords;};
     
     // wisdom 
-    virtual void learnWisdom(Real cutoff) = 0;
+    virtual void learnWisdom(Real cutoff, int nPeaks) = 0;
     virtual int getNuWisdom() const = 0;
     
     // signature for cost measurement

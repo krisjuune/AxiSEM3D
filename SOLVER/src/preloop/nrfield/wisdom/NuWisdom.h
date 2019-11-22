@@ -39,6 +39,7 @@ struct LearnParameters {
     bool mInvoked;
     double mCutoff;
     int mInterval;
+    int mNPeaks;
     std::string mFileName;
 };
 

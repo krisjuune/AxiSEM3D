@@ -28,6 +28,9 @@ void Volumetric3D_EMC::initialize() {
     if (XMPI::root()) {
         std::vector<size_t> dims;
         std::string fname = Parameters::sInputDirectory + "/" + mFileName;
+        std::string latStr = mCartesian ? "x" : "latitude";
+        std::string lonStr = mCartesian ? "y" : "longitude";
+ 
         if (mOneFilePerDepth) {
             // get all files
             DIR *dir = opendir(fname.c_str());
@@ -72,14 +75,14 @@ void Volumetric3D_EMC::initialize() {
             if (NetCDF_Reader::checkNetCDF_isAscii(fileDepth[0].first)) {
                 NetCDF_ReaderAscii reader;
                 reader.open(fileDepth[0].first);
-                reader.read1D("lat", dlat);
-                reader.read1D("lon", dlon);
+                reader.read1D(latStr, dlat);
+                reader.read1D(lonStr, dlon);
                 reader.close();
             } else {
                 NetCDF_Reader reader;
                 reader.open(fileDepth[0].first);
-                reader.read1D("lat", dlat);
-                reader.read1D("lon", dlon);
+                reader.read1D(latStr, dlat);
+                reader.read1D(lonStr, dlon);
                 reader.close();
             }
             flat = dlat.cast<float>();
@@ -115,16 +118,16 @@ void Volumetric3D_EMC::initialize() {
                 NetCDF_ReaderAscii reader;
                 reader.open(fname);
                 reader.read1D("depth", fdep);
-                reader.read1D("latitude", flat);
-                reader.read1D("longitude", flon);
+                reader.read1D(latStr, flat);
+                reader.read1D(lonStr, flon);
                 reader.readMetaData(mVarName, fdata, dims);
                 reader.close();
             } else {
                 NetCDF_Reader reader;
                 reader.open(fname);
                 reader.read1D("depth", fdep);
-                reader.read1D("latitude", flat);
-                reader.read1D("longitude", flon);
+                reader.read1D(latStr, flat);
+                reader.read1D(lonStr, flon);
                 reader.readMetaData(mVarName, fdata, dims);
                 reader.close();
             }

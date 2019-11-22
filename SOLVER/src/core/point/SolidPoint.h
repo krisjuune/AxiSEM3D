@@ -55,7 +55,7 @@ public:
     void addToStiff(const CMatX3 &source);
     
     // wisdom
-    void learnWisdom(Real cutoff);
+    void learnWisdom(Real cutoff, int nPeaks);
     int getNuWisdom() const;
     
     // get displacement
@@ -81,7 +81,10 @@ private:
     ABC *mABC = 0;
 
     // max disp norm for wisddom learning
-    RRow3 mMaxDisplWisdom = -RRow3::Ones();
+    CMatX3 mLastDisplWisdom = CMatX3::Zero(mNu + 1, 3);
+    RRow3 mLastMaxDisplWisdom = -RRow3::Ones();
     Eigen::Matrix<int, 1, 3> mNuWisdom = Eigen::Matrix<int, 1, 3>::Zero();
+    Eigen::Matrix<int, 1, 3> mPeaksWisdom = Eigen::Matrix<int, 1, 3>::Zero();
+    Eigen::Matrix<bool, 1, 3> mApproachingPeak = Eigen::Matrix<bool, 1, 3>::Ones();
 };
 

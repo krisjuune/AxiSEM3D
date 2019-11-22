@@ -15,7 +15,7 @@ SolidPoint::SolidPoint(int nr, bool axial, const RDCol2 &crds, Mass *mass,
     mAccel = CMatX3::Zero(mNu + 1, 3);
     mStiff = CMatX3::Zero(mNu + 1, 3);
     mMass->checkCompatibility(nr);
-    mNuWisdom.fill(mNu);
+    //mNuWisdom.fill(mNu);
 }
 
 SolidPoint::~SolidPoint() {
@@ -252,30 +252,69 @@ void SolidPoint::maskField(CMatX3 &field) {
     }
 }
 
-void SolidPoint::learnWisdom(Real cutoff) {
-    for (int idim = 0; idim < 3; idim++) {
-        // L2 norm
-        Real L2norm = mDispl.col(idim).squaredNorm();
-        // Hilbert norm
-        Real h2norm = L2norm - .5 * mDispl.col(idim).row(0).squaredNorm();
-        if (h2norm <= mMaxDisplWisdom(idim)) {
-            continue;
-        }
-        mMaxDisplWisdom(idim) = h2norm;
+void SolidPoint::learnWisdom(Real cutoff, int nPeaks) {
+    if (nPeaks == 0) {
+        for (int idim = 0; idim < 3; idim++) {
+            // L2 norm
+            Real L2norm = mDispl.col(idim).squaredNorm();
+            // Hilbert norm
+            Real h2norm = L2norm - .5 * mDispl.col(idim).row(0).squaredNorm();
+            if (h2norm <= mLastMaxDisplWisdom(idim)) {
+                continue;
+            }
+            mLastMaxDisplWisdom(idim) = h2norm;
         
-        // try smaller orders
-        Real tol = h2norm * cutoff * cutoff;
-        bool found = false;
-        for (int newNu = 0; newNu < mNu; newNu++) {
-            Real diff = L2norm - mDispl.col(idim).topRows(newNu + 1).squaredNorm();
-            if (diff <= tol) {
-                mNuWisdom(idim) = newNu;
-                found = true;
-                break;
+            // try smaller orders
+            Real tol = h2norm * cutoff * cutoff;
+            bool found = false;
+            for (int newNu = 0; newNu < mNu; newNu++) {
+                Real diff = L2norm - mDispl.col(idim).topRows(newNu + 1).squaredNorm();
+                if (diff <= tol) {
+                    mNuWisdom(idim) = newNu;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                mNuWisdom(idim) = mNu;
             }
         }
-        if (!found) {
-            mNuWisdom(idim) = mNu;
+    } else {
+        for (int idim = 0; idim < 3; idim++) {
+            if (mPeaksWisdom(idim) >= nPeaks) {
+                continue;
+            }
+            
+            Real L2norm = mDispl.col(idim).squaredNorm();
+            // Hilbert norm
+            Real h2norm = L2norm - .5 * mDispl.col(idim).row(0).squaredNorm();
+            if (h2norm <= mLastMaxDisplWisdom(idim)) {
+                if (mApproachingPeak(idim)) {
+                    // try smaller orders
+                    Real tol = mLastMaxDisplWisdom(idim) * cutoff * cutoff;
+                    bool found = false;
+                    for (int newNu = 0; newNu < mNu; newNu++) {
+                        Real diff = mLastDisplWisdom.col(idim).squaredNorm() 
+                                  - mLastDisplWisdom.col(idim).topRows(newNu + 1).squaredNorm();
+                        if (diff <= tol) {
+                            mNuWisdom(idim) = std::max({newNu, mNuWisdom(idim)});
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        mNuWisdom(idim) = mNu;
+                    }
+                    // reset peak-search 
+                    mLastMaxDisplWisdom(idim) = 0;
+                    mApproachingPeak(idim) = false;    
+                    mPeaksWisdom(idim) += 1;
+                }
+            } else {
+                mApproachingPeak(idim) = (mLastMaxDisplWisdom(idim) > tinyDouble);
+                mLastDisplWisdom.col(idim) = mDispl.col(idim);
+                mLastMaxDisplWisdom(idim) = h2norm;
+            }
         }
     }
 }
