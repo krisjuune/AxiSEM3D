@@ -8,7 +8,7 @@
 #include <fstream>
 #include <sstream>
 
-unsigned SolverFFTW::mWisdomLearnOption = FFTW_PATIENT;
+unsigned SolverFFTW::mWisdomLearnOption = FFTW_MEASURE;
 bool SolverFFTW::mDisableWisdom = false; 
 
 void SolverFFTW::importWisdom(bool disableWisdom) {
@@ -17,7 +17,7 @@ void SolverFFTW::importWisdom(bool disableWisdom) {
         mWisdomLearnOption = FFTW_ESTIMATE;
         return;
     }
-    mWisdomLearnOption = FFTW_PATIENT;
+    mWisdomLearnOption = FFTW_MEASURE;
     
     std::string wisdomstr = "";
     if (XMPI::root()) {

@@ -65,7 +65,7 @@ void Volumetric3D_SEG::initialize(const std::vector<std::string> &params) {
     }
 
     // read raw data
-    std::string path = projectDirectory + "/src/3d_model/3d_volumetric/SEG/C3NA_data";
+    std::string path = projectDirectory + "../SEG_C3_model";
     if (XMPI::root()) {
         // std::fstream fsx, fsy, fsz;
         // fsx.open(path + "/SEG_C3NA.crdx", std::fstream::in);
