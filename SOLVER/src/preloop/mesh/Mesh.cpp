@@ -277,9 +277,8 @@ void Mesh::buildLocal(const DecomposeOption &option) {
             // 1D Quad
             Quad *quad = new Quad(*mExModel, iquad, *mNrField);
             // 3D model
-            int ABPosition = mExModel->getABPosition(iquad);
-            quad->addVolumetric3D(mVolumetric3D, mSrcLat, mSrcLon, mSrcDep, mPhi2D, ABPosition);
-            quad->addGeometric3D(mGeometric3D, mSrcLat, mSrcLon, mSrcDep, mPhi2D, ABPosition);
+            quad->addVolumetric3D(mVolumetric3D, mSrcLat, mSrcLon, mSrcDep, mPhi2D);
+            quad->addGeometric3D(mGeometric3D, mSrcLat, mSrcLon, mSrcDep, mPhi2D);
             if (mOceanLoad3D != 0) {
                 quad->setOceanLoad3D(*mOceanLoad3D, mSrcLat, mSrcLon, mSrcDep, mPhi2D);
             }
@@ -300,7 +299,7 @@ void Mesh::buildLocal(const DecomposeOption &option) {
     XMPI::cout << "Generating cardinal points...";
     MultilevelTimer::begin("Setup Points", 2);
     for (int iloc = 0; iloc < mLocalElemToGLL.size(); iloc++) {
-        mQuads[iloc]->setupGLLPoints(mGLLPoints, mLocalElemToGLL[iloc], mExModel->getDistTolerance(), mExModel->isCartesian(),
+        mQuads[iloc]->setupGLLPoints(mGLLPoints, mLocalElemToGLL[iloc], mExModel->getDistTolerance(),
                             mVref_range, mU0_range, mABCPar);
     }
     MultilevelTimer::end("Setup Points", 2);
@@ -560,16 +559,38 @@ void Mesh::test() {
 }
 
 std::string Mesh::ABC_verbose() const {
+    std::stringstream m, d, U;
+    if (mExModel->hasMeshExtension()) {
+        m << "automatic extension to accomodate sponge layers";
+    } else {
+        m << "sponge layers created within input mesh";
+    }
+    
+    if (mExModel->hasParallelModelExtension()) {
+        d << "parallel extension into sponge";
+    } else {
+        d << "no special consideration for sponge region";
+    }
+    
+    if (mU0_range[0] == mU0_range[1]) {
+        U << mU0_range[1];
+    } else {
+        U << mU0_range[0] << " - " << mU0_range[1];
+    }
+    
     std::stringstream ss;
     ss << "\n=================== Absorbing Boundaries ===================" << std::endl;
-    if (mExModel->hasSpongeABC()) {
-        ss << "  Sponge Boundary with Mesh Extension_______________________" << std::endl;
-        ss << "    Absorbing Layers     =   " << mABCPar->n << std::endl;
-        ss << "    Boundary Width (km)  =   " << mABCPar->width / 1000 << std::endl;
-        ss << "    Total Boundary Elem. =   " << mExModel->getNumQuads() - mExModel->getNumQuadsInner() << std::endl;
-        ss << "    Total Normal Elem.   =   " << mExModel->getNumQuadsInner() << std::endl;
-        ss << "    Attenuation Type     =   " << mABCPar->s_type << std::endl;
-        ss << "    Max. Attenuations    =   " << mU0_range[0] << " ... " << mU0_range[1] << std::endl;
+    if (mExModel->hasSpongeBoundary()) {
+        ss << "  Sponge Boundary___________________________________________" << std::endl;
+        ss << "    Handling of mesh          =   " << m.str() << std::endl;
+        ss << "    Handling 3D model         =   " << d.str() << std::endl;
+        ss << "    Absorbing Layers (min)    =   " << mABCPar->n << std::endl;
+        ss << "    Min. Boundary Width (km)  =   " << mABCPar->width.minCoeff() / 1000 << std::endl;
+        ss << "    Total Boundary Elem.      =   " << mExModel->getNumQuads() - mExModel->getNumQuadsInner() << std::endl;
+        ss << "    Total Normal Elem.        =   " << mExModel->getNumQuadsInner() << std::endl;
+        ss << "    Attenuation Type          =   " << mABCPar->s_type << std::endl;
+        ss << "    Max. Attenuation          =   " << U.str() << std::endl;
+        
     } else {
         ss << "  No Sponge Boundary." << std::endl;
     }

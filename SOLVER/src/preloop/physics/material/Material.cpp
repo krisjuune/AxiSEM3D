@@ -94,7 +94,7 @@ Material::Material(const Quad *myQuad, const ExodusModel &exModel): mMyQuad(myQu
 }
 
 void Material::addVolumetric3D(const std::vector<Volumetric3D *> &m3D,
-    double srcLat, double srcLon, double srcDep, double phi2D, const int ABPosition) {
+    double srcLat, double srcLon, double srcDep, double phi2D) {
     if (m3D.size() == 0) {
         return;
     }
@@ -126,20 +126,7 @@ void Material::addVolumetric3D(const std::vector<Volumetric3D *> &m3D,
     for (int ipol = 0; ipol <= nPol; ipol++) {
         for (int jpol = 0; jpol <= nPol; jpol++) {
             // geographic coordinates of cardinal points
-
-            // coordinates of reference points if copied for absorbing boundary
-            int refloc_i = ipol;
-            int refloc_j = jpol;
-            if (ABPosition == 1) { // right boundary
-                refloc_i = nPol;
-            } else if (ABPosition == 2) { //lower boundary
-                refloc_j = nPol;
-            } else if (ABPosition == 3) { //corner
-                refloc_i = nPol;
-                refloc_j = nPol;
-            }
-
-            const RDCol2 &xieta = SpectralConstants::getXiEta(refloc_i, refloc_j, mMyQuad->isAxial());
+            const RDCol2 &xieta = SpectralConstants::getXiEta(ipol, jpol, mMyQuad->isAxial());
             const RDMatX3 &rtp = mMyQuad->computeGeocentricGlobal(srcLat, srcLon, srcDep, xieta, Nr, phi2D);
             int ipnt = ipol * nPntEdge + jpol;
             for (int alpha = 0; alpha < Nr; alpha++) {

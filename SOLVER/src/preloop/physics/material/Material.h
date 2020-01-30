@@ -22,8 +22,7 @@ public:
     
     // add 3D
     void addVolumetric3D(const std::vector<Volumetric3D *> &m3D,
-        double srcLat, double srcLon, double srcDep, double phi2D,
-        const int ABPosition);
+        double srcLat, double srcLon, double srcDep, double phi2D);
 
     // Mass
     arPP_RDColX computeElementalMass() const;

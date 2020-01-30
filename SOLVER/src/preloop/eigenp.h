@@ -43,6 +43,7 @@ typedef Eigen::Matrix<int, Eigen::Dynamic, 1> IColX;
 typedef Eigen::Matrix<int, Eigen::Dynamic, 4> IMatX4;  
 
 // others
+typedef Eigen::Matrix<double, 1, 5> RDRow5;
 typedef Eigen::Matrix<double, 4, 1> RDCol4;
 typedef Eigen::Matrix<bool, 4, 1> BCol4;
 typedef Eigen::Matrix<double, nPntEdge, 1> RDColP; // spectral constants

@@ -41,6 +41,8 @@ public:
     static void gaussianSmoothing(RDMatXX &data, 
         IColX orderRow, RDColX devRow, bool periodRow, 
         IColX orderCol, RDColX devCol, bool periodCol);
+        
+    static double RobustRoundUp(double a, double err);
     
     ////////////////// flatten-structured cast //////////////////
     // structured

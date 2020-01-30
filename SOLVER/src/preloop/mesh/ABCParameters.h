@@ -11,23 +11,33 @@ class ExodusModel;
 class ABCParameters {
 
 public:
+    bool isCartesian;
     int n, U_type;
-    double Hmax, width, U, T;
-    RDCol2 boundaries;
+    double U, T;
+    RDCol2 outerCorner, innerCorner, width;
     std::vector<double> depths;
     std::vector<double> Us;
     std::string s_type;
 
     ABCParameters(const Parameters &par, const ExodusModel *exModel) {
-
+    
+    isCartesian = exModel->isCartesian();
     T = 2 * par.getValue<double>("SOURCE_STF_HALF_DURATION");
 
-    Hmax = exModel->getHmax();
     n = exModel->getNumAbsElements();
-    width = n * Hmax;
     
-    boundaries = exModel->getBoundaries();
+    innerCorner = exModel->getSpongeStartCoords();
+    outerCorner = exModel->getMeshBoundaryCoords();
     
+    if (!isCartesian) {
+        innerCorner = innerCorner.colwise().reverse();
+        outerCorner = outerCorner.colwise().reverse();
+    }
+    
+    width = outerCorner - innerCorner;
+    width = width.cwiseAbs();
+    
+    // sponge parametrisation type
     s_type = par.getValue<std::string>("ABC_SPONGE_BOUNDARIES_TYPE");
     if (boost::iequals(s_type, "constant")) {
         U_type = 0;
@@ -48,8 +58,7 @@ public:
         throw std::runtime_error("ABCParameters::ABCParameters || "
             "Unknown ABC absorbtion factor format " + s_type + ".");
     }
-
-    width = n * Hmax;
+    
     };
 
 };

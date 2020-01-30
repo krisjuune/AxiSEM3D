@@ -68,10 +68,10 @@ CColX ABC::StaceyTraction(const CColX veloc) const {
         
         // FFT forward    
         SolverFFTW_1::computeC2R(mNr);
-        RColX velocR = SolverFFTW_1::getC2R_RMat();
+        RColX velocR = SolverFFTW_1::getC2R_RMat().topRows(mNr);
         RColX &tractionR = SolverFFTW_1::getR2C_RMat();
 
-        tractionR =  mVp_Rho.array().pow(-1.) * velocR.array() * mWeight;
+        tractionR.topRows(mNr) = mVp_Rho.array().pow(-1.) * velocR.array() * mWeight;
 
         // FFT backward
         SolverFFTW_1::computeR2C(mNr);
@@ -90,7 +90,7 @@ void ABC::applyKosloffDamping(CMatX3 &accel, const CMatX3 veloc, const CMatX3 di
     
     if (mKosloff3D) {
         CMatX3 &displC = SolverFFTW_3::getC2R_CMat();
-        displC = displ;
+        displC.topRows(mNu + 1) = displ;
         SolverFFTW_3::computeC2R(mNr);
         RMatX3 displR = SolverFFTW_3::getC2R_RMat();
         
@@ -107,7 +107,7 @@ void ABC::applyKosloffDamping(CMatX3 &accel, const CMatX3 veloc, const CMatX3 di
         accelR = SolverFFTW_3::getC2R_RMat();
 
         for (int alpha = 0; alpha < mNr; alpha++) {
-            accelR.row(alpha) -=  mGamma(alpha) * velocR.row(alpha) + mGamma(alpha) * velocR.row(alpha) + mGamma(alpha) * mGamma(alpha) * displR.row(alpha);
+            accelR.row(alpha) -= mGamma(alpha) * velocR.row(alpha) + mGamma(alpha) * velocR.row(alpha) + mGamma(alpha) * mGamma(alpha) * displR.row(alpha);
         }
         
         SolverFFTW_3::computeR2C(mNr);
@@ -116,7 +116,7 @@ void ABC::applyKosloffDamping(CMatX3 &accel, const CMatX3 veloc, const CMatX3 di
     } else {
         
         for (int alpha = 0; alpha <= mNu; alpha++) {
-            accel.row(alpha) -=  mGamma(0) * veloc.row(alpha) + mGamma(0) * veloc.row(alpha) + mGamma(0) * mGamma(0) * displ.row(alpha);
+            accel.row(alpha) -= mGamma(0) * veloc.row(alpha) + mGamma(0) * veloc.row(alpha) + mGamma(0) * mGamma(0) * displ.row(alpha);
         }
     }
 }
@@ -128,19 +128,19 @@ void ABC::applyKosloffDamping(CColX &accel, const CColX veloc, const CColX displ
     
     if (mKosloff3D) {
         CColX &displC = SolverFFTW_1::getC2R_CMat();
-        displC = displ;
+        displC.topRows(mNu + 1) = displ;
         SolverFFTW_1::computeC2R(mNr);
         RColX displR = SolverFFTW_1::getC2R_RMat();
         
         CColX &velocC = SolverFFTW_1::getC2R_CMat();
-        velocC = veloc;
+        velocC.topRows(mNu + 1) = veloc;
         SolverFFTW_1::computeC2R(mNr);
         RColX velocR = SolverFFTW_1::getC2R_RMat();
         
         RColX &accelR = SolverFFTW_1::getR2C_RMat();
         
         CColX &accelC = SolverFFTW_1::getC2R_CMat();
-        accelC = accel;
+        accelC.topRows(mNu + 1) = accel;
         SolverFFTW_1::computeC2R(mNr);
         accelR = SolverFFTW_1::getC2R_RMat();
 

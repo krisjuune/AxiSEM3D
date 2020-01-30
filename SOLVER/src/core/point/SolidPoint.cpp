@@ -306,15 +306,14 @@ void SolidPoint::learnWisdom(Real cutoff, int nPeaks) {
                         mNuWisdom(idim) = mNu;
                     }
                     // reset peak-search 
-                    mLastMaxDisplWisdom(idim) = 0;
                     mApproachingPeak(idim) = false;    
                     mPeaksWisdom(idim) += 1;
                 }
             } else {
-                mApproachingPeak(idim) = (mLastMaxDisplWisdom(idim) > tinyDouble);
-                mLastDisplWisdom.col(idim) = mDispl.col(idim);
-                mLastMaxDisplWisdom(idim) = h2norm;
+                mApproachingPeak(idim) = (h2norm > tinyDouble);
             }
+            mLastDisplWisdom.col(idim) = mDispl.col(idim);
+            mLastMaxDisplWisdom(idim) = h2norm;
         }
     }
 }

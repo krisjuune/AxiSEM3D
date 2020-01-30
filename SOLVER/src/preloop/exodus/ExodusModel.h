@@ -33,16 +33,15 @@ public:
       } catch (...) {return 6371000.0;}
     };
     bool isCartesian() const {return mGlobalRecords.at("crdsys") != "spherical";};
-    bool hasStaceyABC() const {return (isCartesian() && mHasStaceyABC);}
-    bool hasSpongeABC() const {return (isCartesian() && mHasSpongeABC);}
+    bool hasStaceyABC() const {return (mHasStaceyABC);}
+    bool hasSpongeBoundary() const {return (mHasSpongeBoundary);}
+    bool hasMeshExtension() const {return (mHasMeshExtension);}
+    bool hasParallelModelExtension() const {return (mHasModelExtension);}
     double getDistTolerance() const {return mDistTolerance;};
     double getHmax() const {return mHmax;};
     double getHmin() const {return mHmin;};
-    RDCol2 getBoundaries() const {
-      RDCol2 b(mNodalS.maxCoeff(),mNodalZ.minCoeff());
-      return b;
-    }
-    RDCol2 getInnerBoundaries() const {return mInnerBoundaries;};
+    RDCol2 getMeshBoundaryCoords() const {return mMeshEdgeCorner;};
+    RDCol2 getSpongeStartCoords() const {return mInnerBoundaryCorner;};
     double getMeshedOcean() const {return mMeshedOceanDepth;};
 
     // Node-wise
@@ -55,7 +54,7 @@ public:
     int getSideAxis(int quadTag) const {return mSideSets.at(mSSNameAxis)(quadTag);};
     int getSideSurface(int quadTag) const {return mSideSets.at(mSSNameSurface)(quadTag);};
     int getSideRightB(int quadTag) const {return mSideSets.at(mSSNameRightB)(quadTag);};
-    int getSideLowerB(int quadTag) const {return mSideSets.at(mSSNameLowerB)(quadTag);};
+    int getSideLowerB(int quadTag) const {return mSideSets.at(mSSNameBottomB)(quadTag);};
     int getSideSolidFluid(int quadTag) const {
         if (mSideSets.find("solid_fluid_boundary") != mSideSets.end()) {
             return mSideSets.at("solid_fluid_boundary")(quadTag);
@@ -67,10 +66,9 @@ public:
     IRow4 getVicinalAxis(int quadTag) const {return mVicinalAxis.row(quadTag);};
 
     int getNumAbsElements() const {return mN_ABC;};
-    bool isExtQuad(int quadTag) const {return (mABfield(quadTag, 1) > 0);};
-    int getCopyTagAB(int quadTag) const {return mABfield(quadTag, 0);};
-    int getABPosition(int quadTag) const {return mABfield(quadTag, 1);}; // 0 = edge of normal mesh; 1 = right ab boundary; 2 = lower ab boundary; 3 = ab corner
-
+    bool isSpongeQuad(int quadTag) const {return (mABfield(quadTag) > 0);}; // 0 = edge of normal mesh; 1 = right ab boundary; 2 = lower ab boundary; 3 = ab corner
+    int getABPosition(int quadTag) const {return mABfield(quadTag);};
+    
     std::string verbose() const;
 
     static void buildInparam(ExodusModel *&exModel, const Parameters &par,
@@ -85,8 +83,15 @@ private:
     void bcastRawData();
     void formStructured();
     void formAuxiliary();
-    void AddAbsorbingBoundaryElements();
-
+    void computeNodalRTheta();
+    void addAbsorbingBoundaryElements();
+    void setInnerBoundary();
+    void setMeshEdge();
+    void handleMeshRefinementForABC();
+    void makeABField(RDCol2 inner);
+    void extendRightSide(int nQuads, int nNodes, int N, double s);
+    void extendBottomSide(int nQuads, int nNodes, int N, double s);
+    
     // file name
     std::string mExodusFileName;
 
@@ -101,7 +106,7 @@ private:
 
     // connectivity and coords
     IMatX4 mConnectivity;
-    RDColX mNodalS, mNodalZ;
+    RDColX mNodalS, mNodalZ, mNodalR, mNodalTheta;
 
     // elemental variables
     std::vector<std::string> mElementalVariableNames_all;
@@ -135,26 +140,28 @@ private:
     // side sets
     std::map<std::string, IColX> mSideSets;
 
-    std::string mSSNameAxis = "t0";
-    std::string mSSNameSurface = "r1";
-    std::string mSSNameRightB = "t1";
-    std::string mSSNameLowerB = "r0";
+    std::string mSSNameAxis;
+    std::string mSSNameSurface;
+    std::string mSSNameRightB;
+    std::string mSSNameBottomB;
 
     ///////////////////////////////////// auxiliary /////////////////////////////////////
     // for Nr map
     RDColX mAveGLLSpacing;
     IMatX4 mVicinalAxis;
     double mDistTolerance;
-    RDCol2 mInnerBoundaries;
 
     // for ABCs
-    bool mHasSpongeABC, mHasStaceyABC;
+    bool mHasSpongeBoundary, mHasMeshExtension, mHasModelExtension, mHasStaceyABC;
     double mHmax, mHmin, mABC_Vmax, mTSource;
-    int mN_ABC, mNumQuadsInner, mNumNodesInner;
-    IMatX2 mABfield;
+    int mNumQuadsInner, mNumNodesInner;
+    RDCol2 mInnerBoundaryCorner, mMeshEdgeCorner;
+    
+    IColX mABfield;
     
     double mABCwidth = -1;
     int mN_maxWL_ABC = -1;
+    int mN_ABC = -1;
     
     // for automated oceantopography
     double mMeshedOceanDepth = 0;

@@ -273,19 +273,16 @@ void FluidPoint::learnWisdom(Real cutoff, int nPeaks) {
                 if (!found) {
                     mNuWisdom = mNu;
                 }
-                //std::cout << mLastMaxDisplWisdom << " -> " << h2norm << "; " << mNu << " -> " << mNuWisdom;
                 // reset peak-search 
-                mLastMaxDisplWisdom = 0;
                 mApproachingPeak = false;    
                 mPeaksWisdom += 1;
             }
-            //std::cout << std::endl;
         } else {
-            
-            mApproachingPeak = (mLastMaxDisplWisdom > tinyDouble);
-            mLastDisplWisdom = mDispl;
-            mLastMaxDisplWisdom = h2norm;
+            mApproachingPeak = h2norm > tinyDouble;
         }
+        mLastDisplWisdom = mDispl;
+        mLastMaxDisplWisdom = h2norm;
+        
     }
 }
 

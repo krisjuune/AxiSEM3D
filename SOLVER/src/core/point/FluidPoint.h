@@ -85,7 +85,7 @@ private:
     Real mLastMaxDisplWisdom = -1.;
     int mNuWisdom = 0;
     int mPeaksWisdom = 0;
-    bool mApproachingPeak = true;
+    bool mApproachingPeak = false;
 
     bool mFluidSurf = false;
 };

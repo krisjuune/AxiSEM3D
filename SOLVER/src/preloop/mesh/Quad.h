@@ -34,11 +34,9 @@ public:
     
     // 3D models
     void addVolumetric3D(const std::vector<Volumetric3D *> &m3D,
-        double srcLat, double srcLon, double srcDep, double phi2D,
-        const int ABPosition);
+        double srcLat, double srcLon, double srcDep, double phi2D);
     void addGeometric3D(const std::vector<Geometric3D *> &g3D,
-        double srcLat, double srcLon, double srcDep, double phi2D,
-        const int ABPosition);
+        double srcLat, double srcLon, double srcDep, double phi2D);
     void setOceanLoad3D(const OceanLoad3D &o3D,
         double srcLat, double srcLon, double srcDep, double phi2D);
     
@@ -51,7 +49,7 @@ public:
     // setup gll points 
     
     void setupGLLPoints(std::vector<GLLPoint *> &gllPoints, const IMatPP &myPointTags,
-        double distTol, bool isCartesian, RDCol2 &Vref_range, RDCol2 &U0_range, const ABCParameters *ABCPar);
+        double distTol, RDCol2 &Vref_range, RDCol2 &U0_range, const ABCParameters *ABCPar);
 
     // create elements and push to domain
     int release(Domain &domain, const IMatPP &myPointTags,
@@ -129,8 +127,9 @@ protected:
     double getCourant() const;
     
     // compute normal
-    RDMatX3 computeNormal(int side, int ipol, int jpol, bool isCartesian) const;
-    void computeNormalGeneral(RDMatX3 &normal, int side, int ipol, int jpol, bool isCartesian) const;
+    RDMatX3 computeNormal(int side, int ipol, int jpol) const;
+    RDMatX3 computeNormalLinear(int side, int ipol, int jpol) const;
+    RDMatX3 computeNormalSpherical(int side, int ipol, int jpol) const;
 
     ////////////////////////////////////////////////// Nodal level
     // quad tag in Exodus
@@ -146,7 +145,7 @@ protected:
     
     // geometric mapping
     Mapping *mMapping;
-    int mCurvedOuter, mCartOuter;
+    int mCurvedOuter;
 
     // solid or fluid
     bool mIsFluid;
