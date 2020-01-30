@@ -40,6 +40,8 @@ void Parameters::registerAll() {
     registerPar("ATTENUATION");
     registerPar("ABC_STACEY_BOUNDARIES");
     registerPar("ABC_SPONGE_BOUNDARIES");
+    registerPar("ABC_SPONGE_BOUNDARIES_EXTEND_MESH");
+    registerPar("ABC_SPONGE_BOUNDARIES_EXTEND_MODEL");
     registerPar("ABC_SPONGE_BOUNDARIES_WIDTH");
     registerPar("ABC_SPONGE_BOUNDARIES_TYPE");
     registerPar("ABC_SPONGE_BOUNDARIES_FACTOR");

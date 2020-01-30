@@ -30,8 +30,7 @@ mMyQuad(quad) {
 }
 
 void Relabelling::addUndulation(const std::vector<Geometric3D *> &g3D,
-    double srcLat, double srcLon, double srcDep, double phi2D,
-    const int ABPosition) {
+    double srcLat, double srcLon, double srcDep, double phi2D) {
     if (g3D.size() == 0) {
         return;
     }
@@ -40,20 +39,9 @@ void Relabelling::addUndulation(const std::vector<Geometric3D *> &g3D,
     int Nr = mMyQuad->getNr();
     for (int ipol = 0; ipol <= nPol; ipol++) {
         for (int jpol = 0; jpol <= nPol; jpol++) {
-            
-            int ipol_ref = ipol;
-            int jpol_ref = jpol;
-            if (ABPosition == 1) { // right boundary
-                ipol_ref = nPol;
-            } else if (ABPosition == 2) { //lower boundary
-                jpol_ref = nPol;
-            } else if (ABPosition == 3) { //corner
-                ipol_ref = nPol;
-                jpol_ref = nPol;
-            }
 
             int ipnt = ipol * nPntEdge + jpol;
-            const RDCol2 &xieta = SpectralConstants::getXiEta(ipol_ref, jpol_ref, mMyQuad->isAxial());
+            const RDCol2 &xieta = SpectralConstants::getXiEta(ipol, jpol, mMyQuad->isAxial());
             for (const auto &model: g3D) {
                 RDMatX3 rtpS;
                 double rElemCenter;

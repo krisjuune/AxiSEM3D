@@ -201,3 +201,13 @@ RDRowN XMath::computeFourierAtPhi(const RDMatXN &data, double phi) {
     }
     return result;
 }
+
+double XMath::RobustRoundUp(const double a, const double err) {
+    double ua = ceil(a);
+    double la = floor(a);
+    if (abs(a-la) < err) {
+        return la;
+    } else {
+        return ua;
+    }
+}

@@ -51,21 +51,7 @@ mQuadTag(quadTag) {
     // geometric mapping
     double distTol = exModel.getDistTolerance();
     double etype = exModel.getElementalVariables("element_type", mQuadTag);
-    if (exModel.isCartesian()) {
-        mMapping = new LinearMapping();
-        double z0 = mNodalCoords(1, 0);
-        double z1 = mNodalCoords(1, 1);
-        double z2 = mNodalCoords(1, 2);
-        double z3 = mNodalCoords(1, 3);
-        if (std::abs(z0 - z1) < distTol && std::abs(z2 - z3) < distTol) {
-            mCartOuter = z2 > z0 ? 2 : 0;
-        } else if (std::abs(z1 - z2) < distTol && std::abs(z3 - z0) < distTol) {
-            mCartOuter = z3 > z1 ? 3 : 1;
-        } else {
-            throw std::runtime_error("Quad::Quad || Invalid linear element shape.");
-        }
-        mCurvedOuter = -1;
-    } else if (etype < .5) {
+    if (etype < .5) {
         // etype = 0.0, spherical
         mMapping = new SphericalMapping();
         double r0 = mNodalCoords.col(0).norm();
@@ -79,12 +65,10 @@ mQuadTag(quadTag) {
         } else {
             throw std::runtime_error("Quad::Quad || Invalid spherical element shape.");
         }
-        mCartOuter = -1;
     } else if (etype < 1.5) {
         // etype = 1.0, linear
         mMapping = new LinearMapping();
         mCurvedOuter = -1;
-        mCartOuter = -1;
     } else {
         // etype = 2.0, semi-spherical
         mMapping = new SemiSphericalMapping();
@@ -103,7 +87,6 @@ mQuadTag(quadTag) {
         } else {
             throw std::runtime_error("Quad::Quad || Invalid semi-spherical element shape.");
         }
-        mCartOuter = -1;
     }
     
     // solid fluid
@@ -126,16 +109,14 @@ mQuadTag(quadTag) {
     mSFSide = exModel.getSideSolidFluid(mQuadTag);
     if (mSFSide >= 0) {
         mOnSFBoundary = true;
-        if (!exModel.isCartesian()) {
-            if (mMapping->getType() == Mapping::MappingTypes::Linear) {
-                throw std::runtime_error("Quad::Quad || Conflict in solid-fluid boundary.");
-            }
-            if (mMapping->getType() == Mapping::MappingTypes::Spherical && (mSFSide + mCurvedOuter) % 2 != 0) {
-                throw std::runtime_error("Quad::Quad || Conflict in solid-fluid boundary.");
-            }
-            if (mMapping->getType() == Mapping::MappingTypes::SemiSpherical && mSFSide != mCurvedOuter) {
-                throw std::runtime_error("Quad::Quad || Conflict in solid-fluid boundary.");
-            }
+        if (mMapping->getType() == Mapping::MappingTypes::Linear && !exModel.isCartesian()) {
+            throw std::runtime_error("Quad::Quad || Conflict in solid-fluid boundary.");
+        }
+        if (mMapping->getType() == Mapping::MappingTypes::Spherical && (mSFSide + mCurvedOuter) % 2 != 0) {
+            throw std::runtime_error("Quad::Quad || Conflict in solid-fluid boundary.");
+        }
+        if (mMapping->getType() == Mapping::MappingTypes::SemiSpherical && mSFSide != mCurvedOuter) {
+            throw std::runtime_error("Quad::Quad || Conflict in solid-fluid boundary.");
         }
     }
 
@@ -144,16 +125,14 @@ mQuadTag(quadTag) {
     mSurfaceSide = exModel.getSideSurface(mQuadTag);
     if (mSurfaceSide >= 0) {
         mOnSurface = true;
-        if (!exModel.isCartesian()) {
-            if (mMapping->getType() == Mapping::MappingTypes::Linear) {
-                throw std::runtime_error("Quad::Quad || Conflict in surface setting.");
-            }
-            if (mMapping->getType() == Mapping::MappingTypes::Spherical && mSurfaceSide != mCurvedOuter) {
-                throw std::runtime_error("Quad::Quad || Conflict in surface setting.");
-            }
-            if (mMapping->getType() == Mapping::MappingTypes::SemiSpherical && mSurfaceSide != mCurvedOuter) {
-                throw std::runtime_error("Quad::Quad || Conflict in surface setting.");
-            }
+        if (mMapping->getType() == Mapping::MappingTypes::Linear && !exModel.isCartesian()) {
+            throw std::runtime_error("Quad::Quad || Conflict in surface setting.");
+        }
+        if (mMapping->getType() == Mapping::MappingTypes::Spherical && mSurfaceSide != mCurvedOuter) {
+            throw std::runtime_error("Quad::Quad || Conflict in surface setting.");
+        }
+        if (mMapping->getType() == Mapping::MappingTypes::SemiSpherical && mSurfaceSide != mCurvedOuter) {
+            throw std::runtime_error("Quad::Quad || Conflict in surface setting.");
         }
     }
     
@@ -171,7 +150,6 @@ mQuadTag(quadTag) {
     mMaterial = new Material(this, exModel);
     
     // relabelling
-    // mRelabelling = new Relabelling(this);
     mRelabelling = 0;
     
     // dt 
@@ -186,14 +164,43 @@ mQuadTag(quadTag) {
     }
 
     // absorbing boundaries
-    mIsExtQuad = exModel.isExtQuad(quadTag);
-    mIsSpongeQuad = (exModel.hasSpongeABC() && mIsExtQuad);
-    if (mIsExtQuad) {
-        for (int i = 0; i < 4; i++) {
-            int nodeTag = connect(exModel.getCopyTagAB(mQuadTag), i);
-            mCopyCoords(0, i) = exModel.getNodalS(nodeTag);
-            mCopyCoords(1, i) = exModel.getNodalZ(nodeTag);
+    mIsSpongeQuad = exModel.isSpongeQuad(mQuadTag);
+    
+    // set Copycoords for 3D model 
+    if (mIsSpongeQuad & exModel.hasParallelModelExtension()) {
+        RDCol2 SpongeStartCoords = exModel.getSpongeStartCoords();
+        int ABPosition = exModel.getABPosition(mQuadTag);
+        
+        RDMat24 nodalCoordsConverted = mNodalCoords; // s, z
+        
+        if (!exModel.isCartesian()) {
+            for (int i = 0; i < 4; i++) {
+                RDCol2 sz = nodalCoordsConverted.col(i);
+                nodalCoordsConverted.col(i) = Geodesy::rtheta(sz);
+            }
+            nodalCoordsConverted.colwise().reverse(); // theta, r
+            SpongeStartCoords.colwise().reverse();
         }
+            
+        if (ABPosition == 1) {
+            nodalCoordsConverted.row(0) = RDRow4::Constant(SpongeStartCoords(0)); // s or theta
+        } else if (ABPosition == 2) {
+            nodalCoordsConverted.row(1) = RDRow4::Constant(SpongeStartCoords(1)); // z or r
+        } else if (ABPosition == 3) {
+            nodalCoordsConverted.row(0) = RDRow4::Constant(SpongeStartCoords(0));
+            nodalCoordsConverted.row(1) = RDRow4::Constant(SpongeStartCoords(1));
+        }
+        
+        if (!exModel.isCartesian()) {
+            for (int i = 0; i < 4; i++) {
+                RDCol2 sz;
+                sz(0) = nodalCoordsConverted(1, i) * sin(nodalCoordsConverted(0, i));
+                sz(1) = nodalCoordsConverted(1, i) * cos(nodalCoordsConverted(0, i));
+                nodalCoordsConverted.col(i) = sz;
+            }
+        }
+        
+        mCopyCoords = nodalCoordsConverted;
     } else {
         mCopyCoords = mNodalCoords;
     }
@@ -212,15 +219,15 @@ Quad::~Quad() {
 }
 
 void Quad::addVolumetric3D(const std::vector<Volumetric3D *> &m3D,
-    double srcLat, double srcLon, double srcDep, double phi2D, const int ABPosition) {
-    mMaterial->addVolumetric3D(m3D, srcLat, srcLon, srcDep, phi2D, ABPosition);
+    double srcLat, double srcLon, double srcDep, double phi2D) {
+    mMaterial->addVolumetric3D(m3D, srcLat, srcLon, srcDep, phi2D);
 }
 
 void Quad::addGeometric3D(const std::vector<Geometric3D *> &g3D, 
-    double srcLat, double srcLon, double srcDep, double phi2D, const int ABPosition) {
+    double srcLat, double srcLon, double srcDep, double phi2D) {
     if (g3D.size() > 0) {
         mRelabelling = new Relabelling(this);
-        mRelabelling->addUndulation(g3D, srcLat, srcLon, srcDep, phi2D, ABPosition);
+        mRelabelling->addUndulation(g3D, srcLat, srcLon, srcDep, phi2D);
     }    
 }
 
@@ -280,7 +287,7 @@ double Quad::getDeltaT() const {
 }
 
 void Quad::setupGLLPoints(std::vector<GLLPoint *> &gllPoints, const IMatPP &myPointTags,
-    double distTol, bool isCartesian, RDCol2 &Vref_range, RDCol2 &U0_range, const ABCParameters *ABCPar) {
+    double distTol, RDCol2 &Vref_range, RDCol2 &U0_range, const ABCParameters *ABCPar) {
     // compute mass on points
     const arPP_RDColX &mass = mMaterial->computeElementalMass();
 
@@ -328,7 +335,7 @@ void Quad::setupGLLPoints(std::vector<GLLPoint *> &gllPoints, const IMatPP &myPo
             
             // normal
             if (sfbry) {
-                RDMatX3 normal = computeNormal(mSFSide, ipol, jpol, isCartesian);
+                RDMatX3 normal = computeNormal(mSFSide, ipol, jpol);
                 // inverse in solid domain
                 if (!mIsFluid) {
                     normal *= -1.;
@@ -339,7 +346,7 @@ void Quad::setupGLLPoints(std::vector<GLLPoint *> &gllPoints, const IMatPP &myPo
             
             if (surface) {
                 // surface area
-                const RDMatX3 &normal = computeNormal(mSurfaceSide, ipol, jpol, isCartesian);
+                const RDMatX3 &normal = computeNormal(mSurfaceSide, ipol, jpol);
                 gllPoints[pointTag]->addSurfNormal(normal);
                 gllPoints[pointTag]->setOceanDepth(mOceanDepth[ipnt]);    
             }
@@ -366,28 +373,38 @@ void Quad::setupGLLPoints(std::vector<GLLPoint *> &gllPoints, const IMatPP &myPo
                 }
                 
                 if (rbry && !lbry) {
-                    computeNormalGeneral(ABCnormal, mABCRightSide, ipol, jpol, isCartesian);
+                    ABCnormal = computeNormal(mABCRightSide, ipol, jpol);
                 } else if (lbry) {
-                    computeNormalGeneral(ABCnormal, mABCLowerSide, ipol, jpol, isCartesian);
+                    ABCnormal = computeNormal(mABCLowerSide, ipol, jpol);
                 }
                 
                 // Kosloff&Kosloff Sponge Boundary
                 if (mIsSpongeQuad) {
-                    double s_dist = std::abs(ABCPar->boundaries[0] - crds[0]);
-                    double z_dist = std::abs(ABCPar->boundaries[1] - crds[1]);
-                    double dist = std::min({s_dist,z_dist});
+                    
+                    RDCol2 convCrds;
+                    if (!ABCPar->isCartesian) {
+                        convCrds = Geodesy::rtheta(crds);
+                    } else {
+                        convCrds = crds;
+                    }
+                    
+                    double sr_frac = (ABCPar->outerCorner[0] - convCrds[0]) / (ABCPar->outerCorner[0] - ABCPar->innerCorner[0]);
+                    double ztheta_frac = (ABCPar->outerCorner[1] - convCrds[1]) / (ABCPar->outerCorner[1] - ABCPar->innerCorner[1]);
+                    double frac = std::min({sr_frac,ztheta_frac});
 
-                    if (rbry && s_dist > tinyDouble) {
+                    if (rbry && frac > tinyDouble) {
                         throw std::runtime_error("Quad::setupGLLPoints || Right ABC - mesh inconsistency.");
                     }
-                    if (lbry && z_dist > tinySingle) {
+                    if (lbry && frac > tinyDouble) {
                         throw std::runtime_error("Quad::setupGLLPoints || Lower ABC - mesh inconsistency.");
                     }
+                    
                     RDColX U0;
                     if (ABCPar->U_type == 0) {
                         U0 = RDColX::Constant(mNr, 1, ABCPar->U);
-                    } else if (ABCPar->U_type == 1) {
-                        RDColX vs, vp;
+                    } else if (ABCPar->U_type == 1) { // empirical
+                        
+                        RDColX vs, vp; // get 3D velocities
                         if (Vp3D.rows() > 1) {
                             vp = Vp3D.col(ipnt);
                             vs = Vs3D.col(ipnt);
@@ -395,11 +412,22 @@ void Quad::setupGLLPoints(std::vector<GLLPoint *> &gllPoints, const IMatPP &myPo
                             vp = RDColX::Constant(mNr, 1, Vp3D(0, ipnt));
                             vs = RDColX::Constant(mNr, 1, Vs3D(0, ipnt));
                         }
-                        if (mIsFluid) {
-                            U0 = 1.76 * exp(-0.08 * ABCPar->width / (vp.array() * ABCPar->T)) 
+                        
+                        double width;
+                        if ((ztheta_frac > sr_frac)) {
+                            width = ABCPar->width[0];
+                        } else {
+                            width = ABCPar->width[1];
+                            if (!ABCPar->isCartesian) { // handle width given in degrees
+                                width *= convCrds[0];
+                            }
+                        }
+                        
+                        if (mIsFluid) { // calculate U0
+                            U0 = 1.76 * exp(-0.08 * width / (vp.array() * ABCPar->T)) 
                                       / ABCPar->T;
                         } else {
-                            U0 = 2.20 * exp(-0.08 * ABCPar->width / (vp.array() * ABCPar->T)) 
+                            U0 = 2.20 * exp(-0.08 * width / (vp.array() * ABCPar->T)) 
                                       * (vs.array() / vp.array()) * (vs.array() / vp.array())
                                       / ABCPar->T;
                         }
@@ -416,7 +444,8 @@ void Quad::setupGLLPoints(std::vector<GLLPoint *> &gllPoints, const IMatPP &myPo
                         if (set == false) Uz = ABCPar->Us.back();
                         U0 = RDColX::Constant(mNr, 1, Uz);
                     }
-                    gamma = U0 * (1 - sin(pi * dist / (2 * ABCPar->width)) * sin(pi * dist / (2 * ABCPar->width)));
+                    
+                    gamma = U0 * (1 - sin(0.5 * pi * frac) * sin(0.5 * pi * frac));
 
                     Vref_range[0]=std::min({Vref_range[0], Vp3D.col(ipnt).minCoeff()});
                     Vref_range[1]=std::max({Vref_range[1], Vp3D.col(ipnt).maxCoeff()});
@@ -740,133 +769,102 @@ RDColX Quad::getHminSlices() const {
     return hmin;
 }
 
-void Quad::computeNormalGeneral(RDMatX3 &normal, int side, int ipol, int jpol, bool isCartesian) const {
+RDMatX3 Quad::computeNormal(int side, int ipol, int jpol) const {
+    RDMatX3 normal;
+    if (mMapping->getType() == Mapping::MappingTypes::Spherical && (side + mCurvedOuter) % 2 == 0) {
+        normal = computeNormalSpherical(side, ipol, jpol);
+    } else if (mMapping->getType() == Mapping::MappingTypes::SemiSpherical && side == mCurvedOuter) {
+        normal = computeNormalSpherical(side, ipol, jpol);
+    } else {
+        normal = computeNormalLinear(side, ipol, jpol);
+    }
+    return normal;
+}
+
+RDMatX3 Quad::computeNormalLinear(int side, int ipol, int jpol) const {
+    RDMatX3 normal(mPointNr(ipol, jpol), 3);
+    
     const RDCol2 &xieta = SpectralConstants::getXiEta(ipol, jpol, mIsAxial);
     const RDCol2 &crds = mapping(xieta);
 
-    double dl, s;
-    RDMat33 Q = RDMat33::Zero(3, 3);
-    IColX normal_inplane = IColX::Zero(3, 1);
-    if (isCartesian) {
-        double dx = std::abs(mNodalCoords(0, side) - mNodalCoords(0, Mapping::period0123(side + 1)));
-        double dz = std::abs(mNodalCoords(1, side) - mNodalCoords(1, Mapping::period0123(side + 1)));
-        if (dx > dz) {
-            if (mNodalCoords(1, side) < mNodalCoords(1, Mapping::period0123(side + 2))) {
-                normal_inplane(2) = -1;
-            } else {
-                normal_inplane(2) = 1;
-            }
-            dl = dx;
-        } else {
-            if (mNodalCoords(0, side) < mNodalCoords(0, Mapping::period0123(side + 2))) {
-                normal_inplane(0) = -1;
-            } else {
-                normal_inplane(0) = 1;
-            }
-            dl = dz;
+    const RDCol2 &sz0 = mNodalCoords.col(side);
+    const RDCol2 &sz1 = mNodalCoords.col(Mapping::period0123(side + 1));
+    double r0, r1, theta0, theta1;
+    Geodesy::rtheta(sz0, r0, theta0);
+    Geodesy::rtheta(sz1, r1, theta1);
+    
+    double rsf = .5 * (r0 + r1); // average radius
+    double dl = rsf * std::abs(theta1 - theta0); // average side length in theta-direction
+
+    double sint = crds(0) / crds.norm();
+    double cost = crds(1) / crds.norm();
+    double s = rsf * sint; // scaling in phi-direction
+    
+    if (abs(sz0(0) - sz1(0)) < tinyDouble) { // cartesian side normal
+        normal.col(0).fill(sz1(1)-sz0(1));//(sz1(1)-sz0(1));
+        normal.col(1).fill(0.);
+        normal.col(2).fill(0.);
+        
+        if (hasRelabelling()) {
+            normal.col(0) *= mRelabelling->getStaceyNormalWeight(ipol, jpol, side);
         }
-
-        Q(0,0) = 1.;
-        Q(1,1) = 1.;
-        Q(2,2) = 1.;
-
-        s = crds(0);
-    } else {
-        double r0, r1, r2, theta0, theta1, theta2;
-        Geodesy::rtheta(mNodalCoords.col(side), r0, theta0);
-        Geodesy::rtheta(mNodalCoords.col(Mapping::period0123(side + 1)), r1, theta1);
-        Geodesy::rtheta(mNodalCoords.col(Mapping::period0123(side + 2)), r2, theta2);
-        double rsf = .5 * (r0 + r1);
-        if (rsf * std::abs(theta1 - theta0) > std::abs(r0 - r1)) {
-            normal_inplane(2) = (r2 > r0) ? -1 : 1;
-            dl = rsf * std::abs(theta1 - theta0);
+    } else if (abs(sz0(1) - sz1(1)) < tinyDouble) { // cartesian top/bottom normal
+        if (hasRelabelling()) {
+            normal = (sz0(0) - sz1(0)) * mRelabelling->getSFNormalRTZ(ipol, jpol);
         } else {
-            normal_inplane(0) = (theta2 > theta0) ? -1 : 1;
-            dl = std::abs(r0 - r1);
+            normal.col(0).fill(0.);
+            normal.col(1).fill(0.);
+            normal.col(2).fill(sz1(0)-sz0(0));
         }
-        double sint = crds(0) / crds.norm();
-        double cost = crds(1) / crds.norm();
-        Q(0, 0) = cost;
-        Q(0, 2) = sint;
-        Q(1, 1) = 1.;
-        Q(2, 0) = -sint;
-        Q(2, 2) = cost;
-
-        s = rsf * sint;
-    }
-    
-    RDMatX3 nRTZ(mPointNr(ipol, jpol), 3);
-    if (hasRelabelling() && normal_inplane(2) != 0) {
-        nRTZ = mRelabelling->getSFNormalRTZ(ipol, jpol);
-        if (normal_inplane(2) == -1) nRTZ *= -1;
+    } else if (abs(theta1 - theta0) < tinyDouble) { // non-cartesian side normal
+        normal.col(0).fill(sz0(1)-sz1(1));
+        normal.col(1).fill(0.);
+        normal.col(2).fill(sz1(0)-sz0(0));
+        if (hasRelabelling()) {
+            normal.col(0) *= mRelabelling->getStaceyNormalWeight(ipol, jpol, side);
+        }
     } else {
-        nRTZ.col(0).fill(normal_inplane(0));
-        nRTZ.col(1).fill(normal_inplane(1));
-        nRTZ.col(2).fill(normal_inplane(2));
+        throw std::runtime_error("Quad::computeNormal || Invalid element shape.");
     }
     
-    if (hasRelabelling() && normal_inplane(0) != 0) {
-        nRTZ.col(0) *= mRelabelling->getStaceyNormalWeight(ipol, jpol, side);
-    }
-    
-    normal = nRTZ * Q.transpose();
-    
-    const RDCol2 &w = 0.5 * SpectralConstants::getWeights(ipol, jpol, mIsAxial);
-    double wsf = (side == 0 || side == 2) ? w(0) : w(1);
+    const RDCol2 &weights = 0.5 * SpectralConstants::getWeights(ipol, jpol, mIsAxial);
+    double wsf = (side == 0 || side == 2) ? weights(0) : weights(1);
     if (mIsAxial) {
         if (ipol == 0) {
             const RDMat22 &J = jacobian(xieta);
-            wsf *= J(0, 0) * dl;
+            normal *= wsf * J(0, 0);
         } else {
-            wsf *= s * dl / (1. + xieta(0));
+            normal *= wsf / (1. + xieta(0)) * crds(0);
         }
     } else {
-        wsf *= s * dl;
+        normal *= wsf * crds(0);
     }
-    normal *= wsf;
+
+    return normal;
 }
 
-RDMatX3 Quad::computeNormal(int side, int ipol, int jpol, bool isCartesian) const {
-    // check element-side type
-    if (mMapping->getType() == Mapping::MappingTypes::Spherical && (side + mCurvedOuter) % 2 != 0) {
-        throw std::runtime_error("Quad::computeNormal || Computing normal on non-spherical side.");
-    }
-    if (mMapping->getType() == Mapping::MappingTypes::SemiSpherical && side != mCurvedOuter) {
-        throw std::runtime_error("Quad::computeNormal || Computing normal on non-spherical side.");
-    }
-
+RDMatX3 Quad::computeNormalSpherical(int side, int ipol, int jpol) const {
     const RDCol2 &xieta = SpectralConstants::getXiEta(ipol, jpol, mIsAxial);
     const RDCol2 &crds = mapping(xieta);
 
-    double dl, s;
+    double r0, r1, theta0, theta1;
+    Geodesy::rtheta(mNodalCoords.col(side), r0, theta0);
+    Geodesy::rtheta(mNodalCoords.col(Mapping::period0123(side + 1)), r1, theta1);
+    
+    double rsf = .5 * (r0 + r1); // average radius
+    double dl = rsf * std::abs(theta1 - theta0); // average side length in theta-direction
+
+    double sint = crds(0) / crds.norm();
+    double cost = crds(1) / crds.norm();
+    double s = rsf * sint; // scaling in phi-direction
+    
     RDMat33 Q = RDMat33::Zero(3, 3);
-    if (isCartesian) {
-        double x0 = mNodalCoords(0, side);
-        double x1 = mNodalCoords(0, Mapping::period0123(side + 1));
-        dl = std::abs(x1 - x0);
-
-        Q(0,0) = 1.;
-        Q(1,1) = 1.;
-        Q(2,2) = 1.;
-
-        s = crds(0);
-    } else {
-        double r0, r1, theta0, theta1;
-        Geodesy::rtheta(mNodalCoords.col(side), r0, theta0);
-        Geodesy::rtheta(mNodalCoords.col(Mapping::period0123(side + 1)), r1, theta1);
-        double rsf = .5 * (r0 + r1);
-        dl = rsf * std::abs(theta1 - theta0);
-
-        double sint = crds(0) / crds.norm();
-        double cost = crds(1) / crds.norm();
-        Q(0, 0) = cost;
-        Q(0, 2) = sint;
-        Q(1, 1) = 1.;
-        Q(2, 0) = -sint;
-        Q(2, 2) = cost;
-
-        s = rsf * sint;
-    }
+    Q(0, 0) = cost;
+    Q(0, 2) = sint;
+    Q(1, 1) = 1.;
+    Q(2, 0) = -sint;
+    Q(2, 2) = cost;
+    
     RDMatX3 nRTZ(mPointNr(ipol, jpol), 3);
     if (hasRelabelling()) {
         nRTZ = mRelabelling->getSFNormalRTZ(ipol, jpol);
@@ -875,6 +873,7 @@ RDMatX3 Quad::computeNormal(int side, int ipol, int jpol, bool isCartesian) cons
         nRTZ.col(1).fill(0.);
         nRTZ.col(2).fill(1.);
     }
+    
     RDMatX3 normal = nRTZ * Q.transpose();
     const RDCol2 &weights = 0.5 * SpectralConstants::getWeights(ipol, jpol, mIsAxial);
     double wsf = (side == 0 || side == 2) ? weights(0) : weights(1);
@@ -888,7 +887,7 @@ RDMatX3 Quad::computeNormal(int side, int ipol, int jpol, bool isCartesian) cons
     } else {
         normal *= wsf * s * dl;
     }
-    if (side != mCurvedOuter && side != mCartOuter) {
+    if (side != mCurvedOuter) {
         normal *= -1.;
     }
     return normal;

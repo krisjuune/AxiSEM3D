@@ -85,6 +85,6 @@ private:
     RRow3 mLastMaxDisplWisdom = -RRow3::Ones();
     Eigen::Matrix<int, 1, 3> mNuWisdom = Eigen::Matrix<int, 1, 3>::Zero();
     Eigen::Matrix<int, 1, 3> mPeaksWisdom = Eigen::Matrix<int, 1, 3>::Zero();
-    Eigen::Matrix<bool, 1, 3> mApproachingPeak = Eigen::Matrix<bool, 1, 3>::Ones();
+    Eigen::Matrix<bool, 1, 3> mApproachingPeak = Eigen::Matrix<bool, 1, 3>::Zero();
 };
 

@@ -329,8 +329,22 @@ void ExodusModel::formStructured() {
     
     mSSNameAxis = isCartesian() ? "x0" : sphere_axis_name;
     mSSNameSurface = isCartesian() ? "y1" : "r1";
-    mSSNameRightB = isCartesian() ? "x1" : "t1";
-    mSSNameLowerB = isCartesian() ? "y0" : "r0";
+    
+    if (!isCartesian()) {
+        if (mSideSets.find("t1") != mSideSets.end()) {
+            mSSNameRightB = "t0";
+        } else {
+            mSSNameRightB = "N/A";
+        }
+        if (mSideSets.find("r0") != mSideSets.end()) {
+            mSSNameBottomB = "r0";
+        } else {
+            mSSNameBottomB = "N/A";
+        }
+    } else {
+        mSSNameRightB = "x1";
+        mSSNameBottomB = "y0";
+    }
 
     // NOTE: we temporarily treat Cartesian meshes as special cases of spherical meshes
     //       by means of moving it to the "north pole". The introduced global
@@ -367,13 +381,16 @@ void ExodusModel::formAuxiliary() {
 
     MultilevelTimer::begin("Process Absorbing Boundaries", 2);
     // extending mesh to incorporate absorbing boundaries
-    mABfield = IMatX2::Constant(getNumQuads(), 2,-1);
+    mABfield = IColX::Constant(getNumQuads(), -1);
     mNumQuadsInner = getNumQuads();
     mNumNodesInner = getNumNodes();
-    mInnerBoundaries = getBoundaries();
 
-    if (mHasSpongeABC) {
-        AddAbsorbingBoundaryElements();
+    if (!isCartesian() && (mHasSpongeBoundary || mHasStaceyABC)) {
+        computeNodalRTheta();
+    }
+
+    if (mHasSpongeBoundary) {
+        addAbsorbingBoundaryElements();
     }
     MultilevelTimer::end("Process Absorbing Boundaries", 2);
 
@@ -473,15 +490,155 @@ void ExodusModel::formAuxiliary() {
     MultilevelTimer::end("Process Exodus Vicinal", 2);
 }
 
-void ExodusModel::AddAbsorbingBoundaryElements() {
-    // calculate number of boundary elements
-    if (mABCwidth < 0) {
+void ExodusModel::addAbsorbingBoundaryElements() {
+    // calculate boundary width in case of wavelengths input
+    if (mN_maxWL_ABC > 0) {
         mABCwidth = mN_maxWL_ABC * mTSource * mABC_Vmax / 1000;
     }
-    mN_ABC = ceil(round(10000 * mABCwidth / mHmax) / 10);
-    // right boundary
-    int nQuads = getNumQuads();
-    int nNodes = getNumNodes();;
+    
+    if (mHasMeshExtension) {
+        if (!isCartesian()) {
+            throw std::runtime_error("ExodusModel::AddAbsorbingBoundaryElements || "
+                "Mesh extension not implemented for non-Cartesian meshes.");
+        }
+        if (mElementalVariables_axis.at("edge_aspect_ratio").maxCoeff() > 1.5) {
+            throw std::runtime_error("ExodusModel::AddAbsorbingBoundaryElements || "
+                "Mesh extension not implemented for meshes with refinements.");
+        }
+        
+        //number of extended elements
+        if (mN_ABC < 0) {
+            mN_ABC = ceil(round(10000 * mABCwidth / mHmax) / 10);
+        }
+        setMeshEdge();
+        mInnerBoundaryCorner = mMeshEdgeCorner;
+        XMPI::cout << "Building right boundary extension..." << XMPI::endl;
+        extendRightSide(getNumQuads(), getNumNodes(), mN_ABC, mHmax);
+        XMPI::cout << "Building bottom boundary extension..." << XMPI::endl << XMPI::endl;
+        extendBottomSide(getNumQuads(), getNumNodes(), mN_ABC, mHmax);
+        setMeshEdge();
+    } else {
+        setMeshEdge();
+        setInnerBoundary();
+        makeABField(mInnerBoundaryCorner);
+    }
+}
+
+void ExodusModel::computeNodalRTheta() {
+    mNodalR = mNodalS.schur(mNodalS) + mNodalZ.schur(mNodalZ);
+    mNodalR = mNodalR.cwiseSqrt();
+    
+    mNodalTheta = RDColX::Zero(getNumNodes());
+    for (int i = 0; i < getNumNodes(); i++) {
+        mNodalTheta(i) = mNodalR(i) > tinyDouble ? mNodalZ(i) / mNodalR(i) : 0;
+        mNodalTheta(i) = acos(mNodalTheta(i));
+    }
+}
+
+void ExodusModel::setMeshEdge() {
+    if (isCartesian()) {
+        mMeshEdgeCorner(0) = mNodalS.maxCoeff();
+        mMeshEdgeCorner(1) = mNodalZ.minCoeff();    
+    } else {
+        mMeshEdgeCorner(0) = mNodalTheta.minCoeff();;
+        mMeshEdgeCorner(1) = mNodalR.maxCoeff();
+    }
+}
+
+void ExodusModel::setInnerBoundary() {
+    RDCol2 innerBoundary;
+    RDCol2 maxdiff(0, 0);
+    
+    RDCol2 crds0, crds1, crds2, crds3;
+    for (int i = 0; i < getNumQuads(); i++) {
+        if (isCartesian()) {
+            crds0 << mNodalS(mConnectivity(i, 0)), mNodalZ(mConnectivity(i, 0));
+            crds1 << mNodalS(mConnectivity(i, 1)), mNodalZ(mConnectivity(i, 1));
+            crds2 << mNodalS(mConnectivity(i, 2)), mNodalZ(mConnectivity(i, 2));
+            crds3 << mNodalS(mConnectivity(i, 3)), mNodalZ(mConnectivity(i, 3));
+        } else {
+            crds0 << mNodalTheta(mConnectivity(i, 0)), mNodalR(mConnectivity(i, 0));
+            crds1 << mNodalTheta(mConnectivity(i, 1)), mNodalR(mConnectivity(i, 1));
+            crds2 << mNodalTheta(mConnectivity(i, 2)), mNodalR(mConnectivity(i, 2));
+            crds3 << mNodalTheta(mConnectivity(i, 3)), mNodalR(mConnectivity(i, 3));
+        }
+        RDCol2 diff0 = crds0 - crds1;
+        RDCol2 diff1 = crds1 - crds2;
+        RDCol2 diff2 = crds2 - crds3;
+        RDCol2 diff3 = crds3 - crds0;
+        
+        diff0 = diff0.cwiseAbs();
+        diff1 = diff1.cwiseAbs();
+        diff2 = diff2.cwiseAbs();
+        diff3 = diff3.cwiseAbs();
+        
+        maxdiff(0) = std::max({diff0(0), diff1(0), diff2(0), diff3(0), maxdiff(0)}); // s or theta
+        maxdiff(1) = std::max({diff0(1), diff1(1), diff2(1), diff3(1), maxdiff(1)}); // z or r
+    }
+    
+    RDCol2 dir_fac(-1, 1);
+    if (mABCwidth > 0) { // wavelength or distance input
+        RDCol2 N;
+        N(0) = XMath::RobustRoundUp(mABCwidth / maxdiff(0), tinyDouble);
+        N(1) = XMath::RobustRoundUp(mABCwidth / maxdiff(1), tinyDouble);
+        if (!isCartesian()) {
+            N(1) = XMath::RobustRoundUp((mABCwidth / mMeshEdgeCorner(1)) / maxdiff(1), tinyDouble); // theta
+        }
+        N(0) = std::max({N(0), 1.});
+        N(1) = std::max({N(1), 1.});
+        
+        mN_ABC = N.minCoeff();
+        
+        innerBoundary(0) = mMeshEdgeCorner(0) + dir_fac(0) * N(0) * maxdiff(0); // s or theta
+        innerBoundary(1) = mMeshEdgeCorner(1) + dir_fac(1) * N(1) * maxdiff(1); // z or r
+    } else { // elements input
+        innerBoundary(0) = mMeshEdgeCorner(0) + dir_fac(0) * mN_ABC * maxdiff(0);
+        innerBoundary(1) = mMeshEdgeCorner(1) + dir_fac(1) * mN_ABC * maxdiff(1);
+    }
+    
+    mInnerBoundaryCorner = innerBoundary;
+}
+
+void ExodusModel::makeABField(RDCol2 inner) {
+    if (!isCartesian()) {
+        inner = inner.colwise().reverse();
+    }
+    
+    RDCol2 crds0, crds1, crds2, crds3;
+    for (int i = 0; i < getNumQuads(); i++) {
+        if (isCartesian()) {
+            crds0 << mNodalS(mConnectivity(i, 0)), mNodalZ(mConnectivity(i, 0));
+            crds1 << mNodalS(mConnectivity(i, 1)), mNodalZ(mConnectivity(i, 1));
+            crds2 << mNodalS(mConnectivity(i, 2)), mNodalZ(mConnectivity(i, 2));
+            crds3 << mNodalS(mConnectivity(i, 3)), mNodalZ(mConnectivity(i, 3));
+        } else {
+            crds0 << mNodalTheta(mConnectivity(i, 0)), mNodalR(mConnectivity(i, 0));
+            crds1 << mNodalTheta(mConnectivity(i, 1)), mNodalR(mConnectivity(i, 1));
+            crds2 << mNodalTheta(mConnectivity(i, 2)), mNodalR(mConnectivity(i, 2));
+            crds3 << mNodalTheta(mConnectivity(i, 3)), mNodalR(mConnectivity(i, 3));
+        }
+        RDCol2 outerCrds(std::max({crds0(0), crds1(0), crds2(0), crds3(0)}), std::min({crds0(1), crds1(1), crds2(1), crds3(1)}));
+        
+        if ((outerCrds(0) > inner(0)) && (outerCrds(1) < inner(1))) {
+            mABfield(i) = 3; // corner
+        } else if (outerCrds(0) > inner(0)) { // right bry
+            mABfield(i) = 1;
+        } else if (outerCrds(1) < inner(1)) {
+            mABfield(i) = 2; // bottom bry
+        } else {
+            continue;
+        }
+        mNumQuadsInner -= 1;
+    }
+}
+
+void ExodusModel::extendRightSide(int nQuads, int nNodes, int N, double h) {
+    // this function adds new elements onto:
+    // - nNodalS, nNodalZ
+    // - mConnectivity
+    // - mSideSets
+    // - mElementalVariables_elem
+    // - mABfield
     
     std::vector<int> rightBQuadTags;
     for (int tag = 0; tag < nQuads; tag++) {
@@ -489,11 +646,11 @@ void ExodusModel::AddAbsorbingBoundaryElements() {
             rightBQuadTags.push_back(tag);
         }
     }
-    int ExtNr = rightBQuadTags.size() * mN_ABC;
-    mNodalS.conservativeResize(nNodes + ExtNr + mN_ABC, 1);
-    mNodalZ.conservativeResize(nNodes + ExtNr + mN_ABC, 1);
+    int ExtNr = rightBQuadTags.size() * N;
+    mNodalS.conservativeResize(nNodes + ExtNr + N, 1);
+    mNodalZ.conservativeResize(nNodes + ExtNr + N, 1);
     mConnectivity.conservativeResize(nQuads + ExtNr, 4);
-    mABfield.conservativeResize(nQuads + ExtNr, 2);
+    mABfield.conservativeResize(nQuads + ExtNr, 1);
     for (auto it = mSideSets.begin(); it != mSideSets.end(); it++) {
         it->second.conservativeResize(nQuads + ExtNr, 1);
         it->second.segment(nQuads, ExtNr) = IColX::Constant(ExtNr, 1, -1);
@@ -503,49 +660,55 @@ void ExodusModel::AddAbsorbingBoundaryElements() {
     }
 
     int BottomRightNode = mConnectivity(rightBQuadTags[0], getSideRightB(rightBQuadTags[0]));
-    mNodalS.segment(nNodes, mN_ABC) = RDColX::LinSpaced(mN_ABC, mNodalS(BottomRightNode) + mHmax, mNodalS(BottomRightNode) + mN_ABC * mHmax);
-    mNodalZ.segment(nNodes, mN_ABC) = RDColX::Constant(mN_ABC, 1, mNodalZ(BottomRightNode));
+    mNodalS.segment(nNodes, N) = RDColX::LinSpaced(N, mNodalS(BottomRightNode) + h, mNodalS(BottomRightNode) + N * h);
+    mNodalZ.segment(nNodes, N) = RDColX::Constant(N, 1, mNodalZ(BottomRightNode));
 
     for (int i = 0; i < rightBQuadTags.size(); i++) {
         int myQuad = rightBQuadTags[i];
         int side = getSideRightB(myQuad);
         int node3_ini = mConnectivity(myQuad, side + 1);
-        int node1_ini = nNodes + i * mN_ABC;
-        mConnectivity.row(nQuads + mN_ABC * i) << mConnectivity(myQuad, side), node1_ini, node1_ini + mN_ABC, node3_ini;
-        for (int j = 0; j < mN_ABC - 1; j++) {
+        int node1_ini = nNodes + i * N;
+        mConnectivity.row(nQuads + N * i) << mConnectivity(myQuad, side), node1_ini, node1_ini + N, node3_ini;
+        for (int j = 0; j < N - 1; j++) {
             int node0 = node1_ini + j;
-            mConnectivity.row(nQuads + i * mN_ABC + j + 1) << node0, node0 + 1, node0 + mN_ABC + 1, node0 + mN_ABC;
+            mConnectivity.row(nQuads + i * N + j + 1) << node0, node0 + 1, node0 + N + 1, node0 + N;
         }
-        mNodalS.segment(node1_ini + mN_ABC, mN_ABC) = RDColX::LinSpaced(mN_ABC, mNodalS(node3_ini) + mHmax, mNodalS(node3_ini) + mN_ABC * mHmax);
-        mNodalZ.segment(node1_ini + mN_ABC, mN_ABC) = RDColX::Constant(mN_ABC, 1, mNodalZ(node3_ini));
+        mNodalS.segment(node1_ini + N, N) = RDColX::LinSpaced(N, mNodalS(node3_ini) + h, mNodalS(node3_ini) + N * h);
+        mNodalZ.segment(node1_ini + N, N) = RDColX::Constant(N, 1, mNodalZ(node3_ini));
         mSideSets.at(mSSNameRightB)(myQuad) = -1;
         for (auto it = mSideSets.begin(); it != mSideSets.end(); it++) {
-            it->second.segment(nQuads + i * mN_ABC, mN_ABC) = IColX::Constant(mN_ABC, 1, it->second(myQuad));
+            it->second.segment(nQuads + i * N, N) = IColX::Constant(N, 1, it->second(myQuad));
         }
-        mSideSets.at(mSSNameRightB)(nQuads + (i + 1) * mN_ABC - 1) = 1;
-        mABfield(myQuad, 1) = 0;
-        mABfield.block(nQuads + i * mN_ABC, 1, mN_ABC, 1) = IColX::Constant(mN_ABC, 1, 1);
-        mABfield.block(nQuads + i * mN_ABC, 0, mN_ABC, 1) = IColX::Constant(mN_ABC, 1, myQuad);
+        mSideSets.at(mSSNameRightB)(nQuads + (i + 1) * N - 1) = 1;
+        mABfield(myQuad) = 0;
+        mABfield.block(nQuads + i * N, 0, N, 1) = IColX::Constant(N, 1, 1);
         for (auto it = mElementalVariables_elem.begin(); it != mElementalVariables_elem.end(); it++) {
-            it->second.segment(nQuads + i * mN_ABC, mN_ABC) = RDColX::Constant(mN_ABC, 1, it->second(myQuad));
+            it->second.segment(nQuads + i * N, N) = RDColX::Constant(N, 1, it->second(myQuad));
         }
     }
+}
 
-    // lower boundary
-    nQuads = getNumQuads();
-    nNodes = getNumNodes();;
-
+void ExodusModel::extendBottomSide(int nQuads, int nNodes, int N, double h) {
+    // this function adds new elements onto:
+    // - nNodalS, nNodalZ
+    // - mConnectivity
+    // - mSideSets
+    // - mElementalVariables_elem
+    // - mABfield
+    
+    // handling of corner elements is implemented in this function 
+    
     std::vector<int> lowerBQuadTags;
     for (int tag = 0; tag < nQuads; tag++) {
         if (getSideLowerB(tag) >= 0) {
             lowerBQuadTags.push_back(tag);
         }
     }
-    ExtNr = lowerBQuadTags.size() * mN_ABC;
-    mNodalS.conservativeResize(nNodes + ExtNr + mN_ABC, 1);
-    mNodalZ.conservativeResize(nNodes + ExtNr + mN_ABC, 1);
+    int ExtNr = lowerBQuadTags.size() * N;
+    mNodalS.conservativeResize(nNodes + ExtNr + N, 1);
+    mNodalZ.conservativeResize(nNodes + ExtNr + N, 1);
     mConnectivity.conservativeResize(nQuads + ExtNr, 4);
-    mABfield.conservativeResize(nQuads + ExtNr, 2);
+    mABfield.conservativeResize(nQuads + ExtNr, 1);
     for (auto it = mSideSets.begin(); it != mSideSets.end(); it++) {
         it->second.conservativeResize(nQuads + ExtNr, 1);
         it->second.segment(nQuads, ExtNr) = IColX::Constant(ExtNr, 1, -1);
@@ -555,46 +718,41 @@ void ExodusModel::AddAbsorbingBoundaryElements() {
     }
 
     int BottomLeftNode = mConnectivity(lowerBQuadTags[0], 0);
-    mNodalS.segment(nNodes, mN_ABC) = RDColX::Constant(mN_ABC, 1, mNodalS(BottomLeftNode));
-    mNodalZ.segment(nNodes, mN_ABC) = RDColX::Constant(mN_ABC, 1, mNodalZ(BottomLeftNode)) - RDColX::LinSpaced(mN_ABC, mHmax, mN_ABC * mHmax);
+    mNodalS.segment(nNodes, N) = RDColX::Constant(N, 1, mNodalS(BottomLeftNode));
+    mNodalZ.segment(nNodes, N) = RDColX::Constant(N, 1, mNodalZ(BottomLeftNode)) - RDColX::LinSpaced(N, h, N * h);
 
     int CornerQuadTag;
     for (int i = 0; i < lowerBQuadTags.size(); i++) {
         int myQuad = lowerBQuadTags[i];
         int side = getSideLowerB(myQuad);
         int node2_ini = mConnectivity(myQuad, side + 1);
-        int node0_ini = nNodes + i * mN_ABC;
-        mConnectivity.row(nQuads + mN_ABC * i) << node0_ini, node0_ini + mN_ABC, node2_ini, mConnectivity(myQuad, side);
-        for (int j = 0; j < mN_ABC - 1; j++) {
+        int node0_ini = nNodes + i * N;
+        mConnectivity.row(nQuads + N * i) << node0_ini, node0_ini + N, node2_ini, mConnectivity(myQuad, side);
+        for (int j = 0; j < N - 1; j++) {
             int node0 = node0_ini + j + 1;
-            mConnectivity.row(nQuads + i * mN_ABC + j + 1) << node0, node0 + mN_ABC, node0 + mN_ABC - 1, node0 - 1;
+            mConnectivity.row(nQuads + i * N + j + 1) << node0, node0 + N, node0 + N - 1, node0 - 1;
         }
-        mNodalS.segment(node0_ini + mN_ABC, mN_ABC) = RDColX::Constant(mN_ABC, 1, mNodalS(node2_ini));
-        mNodalZ.segment(node0_ini + mN_ABC, mN_ABC) = RDColX::Constant(mN_ABC, 1, mNodalZ(node2_ini)) - RDColX::LinSpaced(mN_ABC, mHmax, mN_ABC * mHmax);
-        mSideSets.at(mSSNameLowerB)(myQuad) = -1;
+        mNodalS.segment(node0_ini + N, N) = RDColX::Constant(N, 1, mNodalS(node2_ini));
+        mNodalZ.segment(node0_ini + N, N) = RDColX::Constant(N, 1, mNodalZ(node2_ini)) - RDColX::LinSpaced(N, h, N * h);
+        mSideSets.at(mSSNameBottomB)(myQuad) = -1;
         for (auto it = mSideSets.begin(); it != mSideSets.end(); it++) {
-            it->second.segment(nQuads + i * mN_ABC, mN_ABC) = IColX::Constant(mN_ABC, 1, it->second(myQuad));
+            it->second.segment(nQuads + i * N, N) = IColX::Constant(N, 1, it->second(myQuad));
         }
-        mSideSets.at(mSSNameLowerB)(nQuads + (i + 1) * mN_ABC - 1) = 0;
+        mSideSets.at(mSSNameBottomB)(nQuads + (i + 1) * N - 1) = 0;
 
         if (mABfield(myQuad, 1) == -1) {
             mABfield(myQuad, 1) = 0;
-            mABfield.block(nQuads + i * mN_ABC, 1, mN_ABC, 1) = IColX::Constant(mN_ABC, 1, 2);
-            mABfield.block(nQuads + i * mN_ABC, 0, mN_ABC, 1) = IColX::Constant(mN_ABC, 1, myQuad);
+            mABfield.block(nQuads + i * N, 0, N, 1) = IColX::Constant(N, 1, 2);
         } else if (mABfield(myQuad, 1) == 0) {
-            CornerQuadTag = myQuad;
-            mABfield.block(nQuads + i * mN_ABC, 1, mN_ABC, 1) = IColX::Constant(mN_ABC, 1, 2);
-            mABfield.block(nQuads + i * mN_ABC, 0, mN_ABC, 1) = IColX::Constant(mN_ABC, 1, myQuad);
+            mABfield.block(nQuads + i * N, 0, N, 1) = IColX::Constant(N, 1, 2);
         } else if (mABfield(myQuad, 1) == 1) {
-            mABfield.block(nQuads + i * mN_ABC, 1, mN_ABC, 1) = IColX::Constant(mN_ABC, 1, 3);
-            mABfield.block(nQuads + i * mN_ABC, 0, mN_ABC, 1) = IColX::Constant(mN_ABC, 1, CornerQuadTag);
+            mABfield.block(nQuads + i * N, 0, N, 1) = IColX::Constant(N, 1, 3);
         }
         for (auto it = mElementalVariables_elem.begin(); it != mElementalVariables_elem.end(); it++) {
-            it->second.segment(nQuads + i * mN_ABC, mN_ABC) = RDColX::Constant(mN_ABC, 1, it->second(myQuad));
+            it->second.segment(nQuads + i * N, N) = RDColX::Constant(N, 1, it->second(myQuad));
         }
     }
 }
-
 
 std::string ExodusModel::verbose() const {
     std::stringstream ss;
@@ -634,13 +792,25 @@ std::string ExodusModel::verbose() const {
     ss << "    " << std::setw(width) << 0 << ": ";
     ss << std::setw(13) << mNodalS(0) << std::setw(13) << mNodalZ(0) << std::endl;
     ss << "    " << std::setw(width) << "..." << std::endl;
-    ss << "    " << std::setw(width) << mNumNodesInner - 1 << ": ";
+    ss << "    " << std::setw(width) << mNumNodesInner << ": ";
     ss << std::setw(13) << mNodalS(mNumNodesInner - 1) << std::setw(13) << mNodalZ(mNumNodesInner - 1) << std::endl;
-    if (mHasSpongeABC) {
+    if (mHasSpongeBoundary && mHasMeshExtension) {
         ss << "    " << std::setw(width) << "..." << std::endl;
         ss << "    " << std::setw(width) << "extended boundary ends at" << std::endl;
         ss << "    " << std::setw(width) << getNumNodes() << ": ";
         ss << std::setw(13) << mNodalS(getNumNodes() - 1) << std::setw(13) << mNodalZ(getNumNodes() - 1) << std::endl;
+    } else if (mHasSpongeBoundary) {
+        ss << "    " << std::setw(width) << "..." << std::endl;
+        ss << "    " << std::setw(width) << "intruding boundary ends at" << std::endl;
+        double s,z;
+        if (isCartesian()) {
+            s = mInnerBoundaryCorner(0);
+            z = mInnerBoundaryCorner(1);
+        } else {
+            s = mInnerBoundaryCorner(1) * sin(mInnerBoundaryCorner(0));
+            z = mInnerBoundaryCorner(1) * cos(mInnerBoundaryCorner(0));
+        }
+        ss << std::setw(19) << s << std::setw(13) << z << std::endl;
     }
     ss << "  Elemental Variables_______________________________________" << std::endl;
     widthname = -1;
@@ -672,18 +842,10 @@ std::string ExodusModel::verbose() const {
     for (auto it = mSideSets.begin(); it != mSideSets.end(); it++) {
         ss << "    " << std::setw(widthname) << it->first << ":   ";
         int pair = 0;
-        for (int q = 0; q < mNumQuadsInner; q++) {
+        for (int q = 0; q < getNumQuads(); q++) {
             pair += (int)(it->second(q) >= 0);
         }
-        ss << pair;
-        if (mHasSpongeABC) {
-            pair = 0;
-            for (int q = mNumQuadsInner; q < getNumQuads(); q++) {
-                pair += (int)(it->second(q) >= 0);
-            }
-            ss << " normal + " << pair << " absorbing";
-        }
-        ss << " edges" << std::endl;
+        ss << pair << " edges" << std::endl;
     }
     ss << "  Miscellaneous_____________________________________________" << std::endl;
     ss << "    Distance Tolerance / m   =   " << mDistTolerance << std::endl;
@@ -705,9 +867,12 @@ void ExodusModel::buildInparam(ExodusModel *&exModel, const Parameters &par,
     exfile = Parameters::sInputDirectory + "/" + exfile;
     exModel = new ExodusModel(exfile);
 
-    exModel->mHasSpongeABC = par.getValue<bool>("ABC_SPONGE_BOUNDARIES");
+    exModel->mHasSpongeBoundary = par.getValue<bool>("ABC_SPONGE_BOUNDARIES");
 
-    if (exModel->mHasSpongeABC) {
+    if (exModel->mHasSpongeBoundary) {
+        exModel->mHasMeshExtension = par.getValue<bool>("ABC_SPONGE_BOUNDARIES_EXTEND_MESH");
+        exModel->mHasModelExtension = par.getValue<bool>("ABC_SPONGE_BOUNDARIES_EXTEND_MODEL");
+        
         std::string mstr = par.getValue<std::string>("ABC_SPONGE_BOUNDARIES_WIDTH");
         std::vector<std::string> strs = Parameters::splitString(mstr, "$");
         std::string format(strs[0]);
@@ -715,6 +880,8 @@ void ExodusModel::buildInparam(ExodusModel *&exModel, const Parameters &par,
             exModel->mN_maxWL_ABC = boost::lexical_cast<int>(strs[1]);
         } else if (boost::iequals(format, "distance")) {
             exModel->mABCwidth = boost::lexical_cast<double>(strs[1]);
+        } else if (boost::iequals(format, "elements")) {
+            exModel->mN_ABC = boost::lexical_cast<int>(strs[1]);
         } else {
             throw std::runtime_error("ExodusModel::buildInparam || "
                 "Unknown ABC extension format " + format + ".");
