@@ -10,7 +10,6 @@
 #include "AutoGeometricParams.h"
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string.hpp>
-#include <iostream>
 
 /////////////////////////////// user-defined models here
 #include "Volumetric3D_s20rts.h"
