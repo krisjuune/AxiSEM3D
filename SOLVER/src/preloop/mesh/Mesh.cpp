@@ -123,7 +123,7 @@ void Mesh::buildUnweighted() {
 double Mesh::getDeltaT() const {
     double dt = DBL_MAX;
     for (int i = 0; i < getNumQuads(); i++) {
-        dt = std::min(dt, mQuads[i]->getDeltaT());
+        dt = std::min(dt, mQuads[i]->getDeltaT(mExModel->isCartesian()));
     }
     return XMPI::min(dt);
 }

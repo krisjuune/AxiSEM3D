@@ -868,10 +868,12 @@ void ExodusModel::buildInparam(ExodusModel *&exModel, const Parameters &par,
     exModel = new ExodusModel(exfile);
 
     exModel->mHasSpongeBoundary = par.getValue<bool>("ABC_SPONGE_BOUNDARIES");
+    exModel->mHasStaceyABC = par.getValue<bool>("ABC_STACEY_BOUNDARIES");
 
     if (exModel->mHasSpongeBoundary) {
         exModel->mHasMeshExtension = par.getValue<bool>("ABC_SPONGE_BOUNDARIES_EXTEND_MESH");
         exModel->mHasModelExtension = par.getValue<bool>("ABC_SPONGE_BOUNDARIES_EXTEND_MODEL");
+        exModel->mTSource = 2 * par.getValue<double>("SOURCE_STF_HALF_DURATION");
         
         std::string mstr = par.getValue<std::string>("ABC_SPONGE_BOUNDARIES_WIDTH");
         std::vector<std::string> strs = Parameters::splitString(mstr, "$");
@@ -887,9 +889,6 @@ void ExodusModel::buildInparam(ExodusModel *&exModel, const Parameters &par,
                 "Unknown ABC extension format " + format + ".");
         }
     }
-
-    exModel->mHasStaceyABC = par.getValue<bool>("ABC_STACEY_BOUNDARIES");
-    exModel->mTSource = 2 * par.getValue<double>("SOURCE_STF_HALF_DURATION");
 
     exModel->initialize();
     if (verbose) {

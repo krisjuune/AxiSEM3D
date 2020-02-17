@@ -47,6 +47,7 @@ public:
     
     // get properties
     RDMatXN getProperty(const std::string &vname, int refType);
+    RDMatXN getRho() const;
 
     //////////// anisotropy /////////////
 private:    

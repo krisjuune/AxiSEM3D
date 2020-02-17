@@ -268,7 +268,7 @@ bool Quad::hasRelabelling() const {
     return !(mRelabelling->isZero());
 }
 
-double Quad::getDeltaT() const {
+double Quad::getDeltaT(bool isCartesian) const {
     // courant number
     double courant = getCourant();
     
@@ -276,7 +276,7 @@ double Quad::getDeltaT() const {
     RDColX vmax = mMaterial->getVMax();
     
     // hmin on slices
-    RDColX hmin = getHminSlices();
+    RDColX hmin = getHminSlices(isCartesian);
     
     // dt on slices
     RDColX dt_slices = courant * hmin.schur(vmax.array().pow(-1.).matrix());
@@ -738,7 +738,7 @@ double Quad::getCourant() const {
     return mDeltaTRef * vmaxRef / hminRef;
 }
 
-RDColX Quad::getHminSlices() const {
+RDColX Quad::getHminSlices(bool isCartesian) const {
     // point coordinates
     std::vector<RDCol2> coordsRef;
     for (int ipol = 0; ipol <= nPol; ipol++) {
@@ -758,9 +758,14 @@ RDColX Quad::getHminSlices() const {
             for (int ipol = 0; ipol <= nPol; ipol++) {
                 for (int jpol = 0; jpol <= nPol; jpol++) {
                     int ipnt = ipol * nPntEdge + jpol;
-                    double theta = Geodesy::theta(coordsRef[ipnt]);
-                    coordsSlice[ipnt](0) += deltaR(islice, ipnt) * sin(theta);
-                    coordsSlice[ipnt](1) += deltaR(islice, ipnt) * cos(theta);
+                    if (isCartesian) {
+                        coordsSlice[ipnt](1) += deltaR(islice, ipnt);
+                    } else {
+                        double theta = Geodesy::theta(coordsRef[ipnt]);
+                        coordsSlice[ipnt](0) += deltaR(islice, ipnt) * sin(theta);
+                        coordsSlice[ipnt](1) += deltaR(islice, ipnt) * cos(theta);
+                    }
+                    
                 }
             }
             hmin(islice) = XMath::findClosestDist(coordsSlice);

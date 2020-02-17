@@ -23,6 +23,4 @@ public:
 
     // check compatibility
     virtual void checkCompatibility(int Nr) const {}; 
-
-    virtual RDMatXN getRho() const = 0;
 };

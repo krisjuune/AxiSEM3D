@@ -210,7 +210,7 @@ void FluidPoint::gatherStiffFromElement(const vec_CMatPP &stiff, int ipol, int j
 void FluidPoint::addToStiff(const CMatX3 &source) {
     // make sure the length of "source" does not exceed mNu + 1
     int rows = std::min(mNu + 1, int(source.rows()));
-    mStiff.topRows(rows) -= source.topRows(rows).rowwise().sum();
+    mStiff.topRows(rows) -= source.col(0).topRows(rows);
 }
 
 void FluidPoint::maskField(CColX &field) {

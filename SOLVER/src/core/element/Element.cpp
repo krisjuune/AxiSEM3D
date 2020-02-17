@@ -33,48 +33,8 @@ Element::~Element() {
 }
 
 void Element::addSourceTerm(const arPP_CMatX3 &source) const {
-    arPP_CMatX3 SF_source = source;
-    if (fluid()) {
-        const Acoustic *acoust = getAcoustic();
-        RMatXN K = acoust->getRho();
-
-        vec_ar3_CMatPP source_F = vec_ar3_CMatPP(mMaxNu + 1, zero_ar3_CMatPP);
-        for (int ipol = 0; ipol <= nPol; ipol++) {
-            for (int jpol = 0; jpol <= nPol; jpol++) {
-                int ipnt = ipol * nPntEdge + jpol;
-                for (int alpha = 0; alpha < SF_source[ipnt].rows(); alpha++) {
-                    for (int i = 0; i < 3; i++) {
-                        source_F[alpha][i](ipol, jpol) = SF_source[ipnt](alpha, i);
-                    }
-                }
-            }
-        }
-
-        RMatXN3 &source_P = SolverFFTW_N3::getR2C_RMat();
-        
-        FieldFFT::transformF2P(source_F, mMaxNr);
-        source_P = SolverFFTW_N3::getC2R_RMat();
-        for (int alpha = 0; alpha < mMaxNr; alpha++) {
-            for (int i = 0; i < 3; i++) {
-                for (int ipnt = 0; ipnt < nPE; ipnt++) {
-                    source_P(alpha, i * nPE + ipnt) *= K(alpha, ipnt);
-                }
-            }
-        }
-        
-        SolverFFTW_N3::computeR2C(mMaxNr);
-        CMatXN3 source_FF = SolverFFTW_N3::getR2C_CMat();
-        for (int ipnt = 0; ipnt < nPE; ipnt++) {
-            for (int alpha = 0; alpha < SF_source[ipnt].rows(); alpha++) {
-                for (int i = 0; i < 3; i++) {
-                    SF_source[ipnt](alpha, i) = source_FF(alpha, i * nPE + ipnt);
-                }
-            }
-        }
-
-    }
     for (int i = 0; i < nPntElem; i++) {
-        mPoints[i]->addToStiff(SF_source[i]);
+        mPoints[i]->addToStiff(source[i]);
     }
 }
 
