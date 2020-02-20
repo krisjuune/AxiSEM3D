@@ -12,6 +12,7 @@ public:
 
     void initialize();
     void initialize(const std::vector<std::string> &params);
+    void setSourceLocation(double srcLat, double srcLon, double srcDep);
     bool get3dProperties(double r, double theta, double phi, double rElemCenter,
         std::vector<MaterialProperty> &properties, 
         std::vector<MaterialRefType> &refTypes,
@@ -34,6 +35,11 @@ private:
     // use geocentric or geographic
     bool mCartesian = false;
     bool mGeographic = false;
+    
+    // source coords
+    double mSrcLat;
+    double mSrcLon;
+    double mSrcDep;
     
     // one-file-per-depth format
     bool mOneFilePerDepth = false;

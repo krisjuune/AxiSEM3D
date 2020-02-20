@@ -44,7 +44,7 @@ public:
     bool hasRelabelling() const;
     
     // get new deltaT
-    double getDeltaT(cool isCartesian) const;
+    double getDeltaT(bool isCartesian) const;
     
     // setup gll points 
     

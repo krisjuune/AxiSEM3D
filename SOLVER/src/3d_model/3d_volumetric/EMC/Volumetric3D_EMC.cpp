@@ -158,7 +158,7 @@ void Volumetric3D_EMC::initialize() {
     RDColX data = fdata.cast<double>();
     
     // SI
-    mGridDep *= 1e3;
+    if (!mCartesian) mGridDep *= 1e3;
     if (mReferenceType == Volumetric3D::MaterialRefType::Absolute) {
         // convert to SI
         data *= MaterialPropertyAbsSI[mMaterialProp];
@@ -261,6 +261,12 @@ void Volumetric3D_EMC::initialize(const std::vector<std::string> &params) {
     initialize();
 }
 
+void Volumetric3D_EMC::setSourceLocation(double srcLat, double srcLon, double srcDep) {
+    mSrcLat = srcLat;
+    mSrcLon = srcLon;
+    mSrcDep = srcDep;
+}
+
 bool Volumetric3D_EMC::get3dProperties(double r, double theta, double phi, double rElemCenter,
     std::vector<MaterialProperty> &properties, 
     std::vector<MaterialRefType> &refTypes,
@@ -273,14 +279,13 @@ bool Volumetric3D_EMC::get3dProperties(double r, double theta, double phi, doubl
     
     double dep, lat, lon;
     if (mCartesian) {
-        RDCol3 rtp = RDCol3::Zero(3, 1);
-        rtp(0) = r;
-        rtp(1) = theta;
-        rtp(2) = phi;
-        RDCol3 xyz = Geodesy::toCartesian(rtp);
-        dep = Geodesy::getROuter() - xyz(0);
-        lat = xyz(1);
-        lon = xyz(2);
+        RDCol3 rtpG;
+        rtpG << r, theta, phi;
+        RDCol3 rtpS = Geodesy::rotateGlob2Src(rtpG, mSrcLat, mSrcLon, mSrcDep);
+        RDCol3 xyz = Geodesy::toCartesian(rtpS);
+        lat = xyz(0);
+        lon = xyz(1);
+        dep = Geodesy::getROuter() - xyz(2);
         
         XMath::checkLimits(dep, 0., Geodesy::getROuter());
     } else {
@@ -361,6 +366,12 @@ bool Volumetric3D_EMC::get3dProperties(double r, double theta, double phi, doubl
 }
 
 std::string Volumetric3D_EMC::verbose() const {
+    double dataMax = 0;
+    double dataMin = 10e9;
+    for (const auto &data: mGridData) {
+        dataMax = std::max({dataMax, data.maxCoeff()});
+        dataMin = std::min({dataMin, data.minCoeff()});
+    }
     std::stringstream ss;
     std::string dim1str = mCartesian ? "XCoord" : "Latitude";
     std::string dim2str = mCartesian ? "YCoord" : "Longitude";
@@ -372,6 +383,7 @@ std::string Volumetric3D_EMC::verbose() const {
     ss << "  Variable Name        =   " << mVarName << std::endl;
     ss << "  Material Property    =   " << MaterialPropertyString[mMaterialProp] << std::endl;
     ss << "  Reference Type       =   " << MaterialRefTypeString[mReferenceType] << std::endl;
+    ss << "  Values               =   [" << dataMin << ", " << dataMax << "]" << std::endl;
     ss << "  Num. Depths          =   " << mGridDep.size() << std::endl;
     ss << "  Num. " << dim1str << "s" << space1 << "       =   " << mGridLat.size() << std::endl;
     ss << "  Num. " << dim2str << "s" << space2 << "      =   " << mGridLon.size() << std::endl;

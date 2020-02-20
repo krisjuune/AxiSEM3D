@@ -121,6 +121,12 @@ void Geometric3D_EMC::initialize(const std::vector<std::string> &params) {
     initialize();
 }
 
+void Geometric3D_EMC::setSourceLocation(double srcLat, double srcLon, double srcDep) {
+    mSrcLat = srcLat;
+    mSrcLon = srcLon;
+    mSrcDep = srcDep;
+}
+
 void Geometric3D_EMC::initializeOcean(double rLayer, double rUpper, double rLower, RDColX lat, RDColX lon, RDMatXX bathymetry) {
     mRLayer = rLayer;
     mRUpper = rUpper;
@@ -141,7 +147,15 @@ double Geometric3D_EMC::getDeltaR(double r, double theta, double phi, double rEl
 
     double lat, lon;
 
-    if (!mCartesian) {
+    if (mCartesian) {
+        RDCol3 rtpG;
+        rtpG << r, theta, phi;
+        RDCol3 rtpS = Geodesy::rotateGlob2Src(rtpG, mSrcLat, mSrcLon, mSrcDep);
+        RDCol3 xyz = Geodesy::toCartesian(rtpS);
+        lat = xyz(0);
+        lon = xyz(1);
+        r = xyz(2);
+    } else {
         // to geocentric
         if (mGeographic) {
             // which radius to use?
@@ -162,10 +176,6 @@ double Geometric3D_EMC::getDeltaR(double r, double theta, double phi, double rEl
             // lon starts from 0.
             XMath::checkLimits(lon, 0., 360.);
         }
-    } else {
-        // cartesian input is r s phi
-        lat = theta * cos(phi);
-        lon = theta * sin(phi);
     }
     
     // interpolation on sphere

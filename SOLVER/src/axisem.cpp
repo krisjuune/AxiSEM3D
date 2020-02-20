@@ -56,7 +56,7 @@ int axisem_main(int argc, char *argv[]) {
         MultilevelTimer::begin("Build 3D Models", 0);
         Volumetric3D::buildInparam(pl.mVolumetric3D, *(pl.mParameters), pl.mExodusModel,
             pl.mVol2Geom3D, srcLat, srcLon, srcDep, verbose);
-        Geometric3D::buildInparam(pl.mGeometric3D, *(pl.mParameters), pl.mVol2Geom3D, verbose);
+        Geometric3D::buildInparam(pl.mGeometric3D, *(pl.mParameters), pl.mVol2Geom3D, srcLat, srcLon, srcDep, verbose);
         OceanLoad3D::buildInparam(pl.mOceanLoad3D, *(pl.mParameters), verbose);
         MultilevelTimer::end("Build 3D Models", 0);
         

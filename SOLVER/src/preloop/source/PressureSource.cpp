@@ -47,11 +47,14 @@ void PressureSource::computeSourceFourier(const Quad &myQuad, const RDColP &inte
     }
     
     p = p.schur(K);
+    int Nu = int(Nr/2) + 1;
     for (int ipnt = 0; ipnt < nPntElem; ipnt++) {
-        fouriers[ipnt] = CMatX3::Zero(Nr, 3);
-        PreloopFFTW::getR2C_RMat(Nr) = p.col(ipnt);
+        fouriers[ipnt] = CMatX3::Zero(Nu, 3);
+        RDColX &R2C_R = PreloopFFTW::getR2C_RMat(Nr);
+        R2C_R = p.col(ipnt);
         PreloopFFTW::computeR2C(Nr);
-        fouriers[ipnt].col(0) = PreloopFFTW::getC2R_CMat(Nr);
+        CDColX F = PreloopFFTW::getR2C_CMat(Nr);
+        fouriers[ipnt].col(0) = F.topRows(Nu);
     }
     
 }

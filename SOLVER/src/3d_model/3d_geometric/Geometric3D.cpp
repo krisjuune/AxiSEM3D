@@ -18,7 +18,8 @@
 /////////////////////////////// user-defined models here
 
 void Geometric3D::buildInparam(std::vector<Geometric3D *> &models,
-        const Parameters &par, std::vector<AutoGeometricParams *> Vol2GeomModels, int verbose) {
+        const Parameters &par, std::vector<AutoGeometricParams *> Vol2GeomModels,
+        double srcLat, double srcLon, double srcDep, int verbose) {
     // clear the container
     for (const auto &m: models) {
         delete m;    
@@ -62,6 +63,7 @@ void Geometric3D::buildInparam(std::vector<Geometric3D *> &models,
         
         // initialize
         m->initialize(params);
+        m->setSourceLocation(srcLat, srcLon, srcDep);
         models.push_back(m);
         
         // verbose

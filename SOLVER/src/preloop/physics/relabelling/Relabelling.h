@@ -50,7 +50,7 @@ public:
     
 private:
     // check hmin
-    void checkHmin();
+    void checkHmin(bool isCartesian);
     
     // compute gradient of deltaR 
     void formGradientUndulation();

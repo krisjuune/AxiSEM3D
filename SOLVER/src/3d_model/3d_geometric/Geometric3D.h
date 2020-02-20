@@ -20,6 +20,7 @@ public:
     virtual void initialize() {};
     virtual void initialize(const std::vector<std::string> &params) {initialize();};
     virtual void initializeOcean(double rLayer, double rUpper, double rLower, RDColX lat, RDColX lon, RDMatXX bathymetry) {};
+    virtual void setSourceLocation(double srcLat, double srcLon, double srcDep) {};
 
     // finalize internal variables if needed
     virtual void finalize() {};
@@ -39,7 +40,8 @@ public:
     
     // build from input parameters
     static void buildInparam(std::vector<Geometric3D *> &models,
-        const Parameters &par, std::vector<AutoGeometricParams *> Vol2GeomModels, int verbose);
+        const Parameters &par, std::vector<AutoGeometricParams *> Vol2GeomModels, 
+        double srcLat, double srcLon, double srcDep, int verbose);
 
 };
 

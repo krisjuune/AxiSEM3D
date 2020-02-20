@@ -45,11 +45,10 @@ void Relabelling::addUndulation(const std::vector<Geometric3D *> &g3D,
             for (const auto &model: g3D) {
                 RDMatX3 rtpS;
                 double rElemCenter;
+                rtpS = mMyQuad->computeGeocentricGlobal(srcLat, srcLon, srcDep, xieta, Nr, phi2D);
                 if (model->isCartesian()) {
-                    rtpS = mMyQuad->computeCartesian(xieta, Nr, phi2D); // r s phi
                     rElemCenter = szCenter(1);
                 } else {
-                    rtpS = mMyQuad->computeGeocentricGlobal(srcLat, srcLon, srcDep, xieta, Nr, phi2D);
                     rElemCenter = szCenter.norm();
                 }
                 for (int alpha = 0; alpha < Nr; alpha++) {
@@ -62,7 +61,7 @@ void Relabelling::addUndulation(const std::vector<Geometric3D *> &g3D,
         }
     }
     if (!isZero()) {
-        checkHmin();
+        checkHmin(0);
         formGradientUndulation();
         formMassUndulation();
     }
@@ -219,7 +218,7 @@ PRT *Relabelling::createPRT(bool elem1D) const {
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 
-void Relabelling::checkHmin() {
+void Relabelling::checkHmin(bool isCartesian) {
     int Nr = mMyQuad->getNr();
     int maxOrder = (Nr + 1) / 2 - 1;
     RDMatXN original = mStiff_dZ;
@@ -231,7 +230,7 @@ void Relabelling::checkHmin() {
             mStiff_dZ.col(ipnt) = data;
         }
         // compute hmin
-        const RDColX &hmin = mMyQuad->getHminSlices();
+        const RDColX &hmin = mMyQuad->getHminSlices(isCartesian);
         double hmin_all = XMath::trigonResampling(5 * Nr, hmin).minCoeff();
         if (hmin_all >= hmin.minCoeff() * .8) {
             // if (order >= 2) {
