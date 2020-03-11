@@ -248,7 +248,7 @@ void Volumetric3D_crust1::initialize(const std::vector<std::string> &params) {
     initialize();
 }
 
-bool Volumetric3D_crust1::get3dProperties(double r, double theta, double phi, double rElemCenter,
+bool Volumetric3D_crust1::get3dPropertiesInternal(double r, double theta, double phi, double rElemCenter,
     std::vector<MaterialProperty> &properties, 
     std::vector<MaterialRefType> &refTypes,
     std::vector<double> &values, bool isFluid) const {

@@ -10,7 +10,6 @@
 // preloop 
 #include "SpectralConstants.h"
 #include "Parameters.h"
-#include "AutoGeometricParams.h"
 #include "ExodusModel.h"
 #include "NrField.h"
 #include "Volumetric3D.h"
@@ -22,6 +21,7 @@
 #include "STF.h"
 #include "ReceiverCollection.h"
 #include "WavefieldRecorder.h"
+#include "DiscontinuityBuilder.h"
 
 // solver
 #include "Domain.h"
@@ -33,7 +33,6 @@ struct PreloopVariables {
     ExodusModel *mExodusModel = 0;
     NrField *mNrField = 0;
     std::vector<Volumetric3D *> mVolumetric3D;
-    std::vector<AutoGeometricParams *> mVol2Geom3D;
     std::vector<Geometric3D *> mGeometric3D;
     OceanLoad3D *mOceanLoad3D = 0;
     Source *mSource = 0;
@@ -41,7 +40,6 @@ struct PreloopVariables {
     AttBuilder *mAttBuilder = 0;
     STF *mSTF = 0;
     ReceiverCollection *mReceivers = 0;
-    WavefieldRecorder *mWFR = 0;
 
     // finalizer
     void finalize() {
@@ -65,11 +63,13 @@ struct PreloopVariables {
 struct SolverVariables {
     Domain *mDomain = 0;
     Newmark *mNewmark = 0;
+    WavefieldRecorder *mWFR = 0;
     
     // finalizer
     void finalize() {
         if (mDomain) {delete mDomain; mDomain = 0;}
         if (mNewmark) {delete mNewmark; mNewmark = 0;}
+        //if (mWFR) {delete mWFR; mWFR = 0;}
     };
 };
 

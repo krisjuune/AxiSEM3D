@@ -35,22 +35,16 @@ void Relabelling::addUndulation(const std::vector<Geometric3D *> &g3D,
         return;
     }
 
-    RDCol2 szCenter = mMyQuad->mapping(RDCol2::Zero());
     int Nr = mMyQuad->getNr();
     for (int ipol = 0; ipol <= nPol; ipol++) {
         for (int jpol = 0; jpol <= nPol; jpol++) {
-
-            int ipnt = ipol * nPntEdge + jpol;
+            // geographic coordinates of cardinal points
             const RDCol2 &xieta = SpectralConstants::getXiEta(ipol, jpol, mMyQuad->isAxial());
+            RDMatX3 rtpS = mMyQuad->computeGeocentricGlobal(srcLat, srcLon, srcDep, xieta, Nr, phi2D);
+            
+            int ipnt = ipol * nPntEdge + jpol;
             for (const auto &model: g3D) {
-                RDMatX3 rtpS;
-                double rElemCenter;
-                rtpS = mMyQuad->computeGeocentricGlobal(srcLat, srcLon, srcDep, xieta, Nr, phi2D);
-                if (model->isCartesian()) {
-                    rElemCenter = szCenter(1);
-                } else {
-                    rElemCenter = szCenter.norm();
-                }
+                double rElemCenter = mMyQuad->computeCenterRadius(model->isCartesian());
                 for (int alpha = 0; alpha < Nr; alpha++) {
                     double r = rtpS(alpha, 0);
                     double t = rtpS(alpha, 1);

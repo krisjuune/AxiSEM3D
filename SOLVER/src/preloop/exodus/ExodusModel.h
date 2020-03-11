@@ -42,7 +42,6 @@ public:
     double getHmin() const {return mHmin;};
     RDCol2 getMeshBoundaryCoords() const {return mMeshEdgeCorner;};
     RDCol2 getSpongeStartCoords() const {return mInnerBoundaryCorner;};
-    double getMeshedOcean() const {return mMeshedOceanDepth;};
 
     // Node-wise
     double getNodalS(int nodeTag) const {return mNodalS(nodeTag);};
@@ -76,6 +75,12 @@ public:
 
     // double getR_CMB() const {return mR_CMB;};
     // double getR_ICB() const {return mR_ICB;};
+    
+    bool findDiscontinuity(double &layer, const std::string &varName, double val, double upper, 
+        double lower, const std::string &compType, const bool from_bottom) const;
+    void findClosestMeshLine(double &layer) const;
+    double upperEdge() const {return mElementalVariableCoords_axis(mElementalVariableCoords_axis.size() - 1) - mDistTolerance/2;};
+    double lowerEdge() const {return mElementalVariableCoords_axis(0) + mDistTolerance/2;};
 
 private:
 
@@ -161,7 +166,4 @@ private:
     double mABCwidth = -1;
     int mN_maxWL_ABC = -1;
     int mN_ABC = -1;
-    
-    // for automated oceantopography
-    double mMeshedOceanDepth = 0;
 };

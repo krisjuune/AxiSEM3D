@@ -118,9 +118,6 @@ void Material::addVolumetric3D(const std::vector<Volumetric3D *> &m3D,
                                         &mC66_3D
     };
     
-    // radius at element center 
-    double rElemCenter = mMyQuad->computeCenterRadius();
-    
     // read 3D model
     int Nr = mMyQuad->getNr();
     for (int ipol = 0; ipol <= nPol; ipol++) {
@@ -140,6 +137,8 @@ void Material::addVolumetric3D(const std::vector<Volumetric3D *> &m3D,
                     std::vector<Volumetric3D::MaterialProperty> properties; 
                     std::vector<Volumetric3D::MaterialRefType> refTypes;
                     std::vector<double> values;
+                    
+                    double rElemCenter = mMyQuad->computeCenterRadius(model->isCartesian());
                     if (!model->get3dProperties(r, t, p, rElemCenter, properties, refTypes, values, mMyQuad->isFluid())) {
                         // point (r, t, p) not in model range
                         continue;

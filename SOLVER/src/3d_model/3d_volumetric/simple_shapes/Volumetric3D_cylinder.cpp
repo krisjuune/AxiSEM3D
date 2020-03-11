@@ -65,6 +65,7 @@ void Volumetric3D_cylinder::initialize(const std::vector<std::string> &params) {
     try {
         int ipar = 10;
         Parameters::castValue(mSourceCentered, params.at(ipar++), source);
+        Parameters::castValue(mCartesian, params.at(ipar++), source);
         Parameters::castValue(mFluid, params.at(ipar++), source);
         Parameters::castValue(mHWHM_lateral, params.at(ipar++), source); mHWHM_lateral *= 1e3;
         Parameters::castValue(mHWHM_top_bot, params.at(ipar++), source); mHWHM_top_bot *= 1e3;
@@ -74,7 +75,17 @@ void Volumetric3D_cylinder::initialize(const std::vector<std::string> &params) {
     
     // compute xyz of endpoints and length
     RDCol3 rtpPoint1, rtpPoint2;
-    if (mSourceCentered) {
+    if (mCartesian) {
+        RDCol3 xyz;
+        xyz(0) = mLat1 * 1000;
+        xyz(1) = mLon1 * 1000;
+        xyz(2) = Geodesy::getROuter() - mD1;
+        rtpPoint1 = Geodesy::Cartesian2Glob(xyz, mSrcLat, mSrcLon, mSrcDep);
+        xyz(0) = mLat2 * 1000;
+        xyz(1) = mLon2 * 1000;
+        xyz(2) = Geodesy::getROuter() - mD2;
+        rtpPoint2 = Geodesy::Cartesian2Glob(xyz, mSrcLat, mSrcLon, mSrcDep);
+    } else if (mSourceCentered) {
         RDCol3 rtpPoint1Src, rtpPoint2Src;
         rtpPoint1Src(0) = Geodesy::getROuter() - mD1;
         rtpPoint1Src(1) = mLat1 * degree;
@@ -115,7 +126,7 @@ void Volumetric3D_cylinder::initialize(const std::vector<std::string> &params) {
     }
 }
 
-bool Volumetric3D_cylinder::get3dProperties(double r, double theta, double phi, double rElemCenter,
+bool Volumetric3D_cylinder::get3dPropertiesInternal(double r, double theta, double phi, double rElemCenter,
     std::vector<MaterialProperty> &properties, 
     std::vector<MaterialRefType> &refTypes,
     std::vector<double> &values, bool isFluid) const {

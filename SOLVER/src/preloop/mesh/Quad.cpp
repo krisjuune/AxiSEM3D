@@ -591,9 +591,14 @@ RDMatX3 Quad::computeCartesian(const RDCol2 &xieta, int npnt, double phi2D) cons
     return zsp_Nr;
 }
 
-double Quad::computeCenterRadius() const {
+double Quad::computeCenterRadius(bool cartesian) const {
     // xi = eta = 0
-    return mapping(RDCol2::Zero()).norm();
+    RDCol2 crds = mapping(RDCol2::Zero(), mCopyCoords);
+    if (cartesian) {
+        return crds(1);
+    } else { 
+        return crds.norm();
+    }
 }
 
 void Quad::computeGradientScalar(const vec_CDMatPP &u, vec_ar3_CDMatPP &u_i) const {

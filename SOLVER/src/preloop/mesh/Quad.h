@@ -72,7 +72,7 @@ public:
     RDMatX3 computeGeocentricGlobal(double srcLat, double srcLon, double srcDep,
         const RDCol2 &xieta, int npnt, double phi2D) const;
     RDMatX3 computeCartesian(const RDCol2 &xieta, int npnt, double phi2D) const;
-    double computeCenterRadius() const;
+    double computeCenterRadius(bool cartesian) const;
     
     // get properties
     int getQuadTag() const {return mQuadTag;};

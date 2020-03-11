@@ -69,7 +69,7 @@ void Volumetric3D_s20rts::finalize() {
     __s20rts_MOD_finalize_s20rts();
 }
 
-bool Volumetric3D_s20rts::get3dProperties(double r, double theta, double phi, double rElemCenter,
+bool Volumetric3D_s20rts::get3dPropertiesInternal(double r, double theta, double phi, double rElemCenter,
     std::vector<MaterialProperty> &properties, 
     std::vector<MaterialRefType> &refTypes,
     std::vector<double> &values, bool isFluid) const {

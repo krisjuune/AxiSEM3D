@@ -11,7 +11,7 @@ public:
     
     void initialize(const std::vector<std::string> &params);
     
-    bool get3dProperties(double r, double theta, double phi, double rElemCenter,
+    bool get3dPropertiesInternal(double r, double theta, double phi, double rElemCenter,
         std::vector<MaterialProperty> &properties, 
         std::vector<MaterialRefType> &refTypes,
         std::vector<double> &values, bool isFluid) const;
@@ -25,6 +25,7 @@ public:
     }
     
     bool makeFluid3D() const {return mFluid;};
+    bool isCartesian() const {return mCartesian;};
     
 private:
     // property name

@@ -9,7 +9,6 @@
 #include "Parameters.h"
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string.hpp>
-#include "AutoGeometricParams.h"
 
 /////////////////////////////// user-defined models here
 #include "Ellipticity.h"
@@ -18,8 +17,7 @@
 /////////////////////////////// user-defined models here
 
 void Geometric3D::buildInparam(std::vector<Geometric3D *> &models,
-        const Parameters &par, std::vector<AutoGeometricParams *> Vol2GeomModels,
-        double srcLat, double srcLon, double srcDep, int verbose) {
+        const Parameters &par, double srcLat, double srcLon, double srcDep, int verbose) {
     // clear the container
     for (const auto &m: models) {
         delete m;    
@@ -35,6 +33,8 @@ void Geometric3D::buildInparam(std::vector<Geometric3D *> &models,
             "MODEL_3D_GEOMETRIC_NUM = " + boost::lexical_cast<std::string>(nmodels) + 
             ", but only " + boost::lexical_cast<std::string>(nsize) + " provided.");
     }
+    
+    int nShiftSize = par.getSize("MODEL_3D_GEOMETRIC_SHIFT");
     
     for (int imodel = 0; imodel < nmodels; imodel++) {
         
@@ -63,7 +63,27 @@ void Geometric3D::buildInparam(std::vector<Geometric3D *> &models,
         
         // initialize
         m->initialize(params);
-        m->setSourceLocation(srcLat, srcLon, srcDep);
+        m->setSourceLocation(srcLat, srcLon, srcDep);        
+        bool hasShift;
+        std::vector<std::string> shiftstrs;
+        if (imodel >= nShiftSize) {
+            hasShift = false;
+        } else {
+            std::string shiftstr = par.getValue<std::string>("MODEL_3D_GEOMETRIC_SHIFT", imodel);
+            shiftstrs = Parameters::splitString(shiftstr, "$");
+            Parameters::castValue(hasShift, shiftstrs[0], "Geometric3D::buildInparam");
+        }
+        
+        if (hasShift) {
+            if (!(shiftstrs.size() == 3)) {
+                throw std::runtime_error("Geometric3D::buildInparam || "
+                    "2 coordinate values required for shifting 3D model.");
+            }
+            double x, y, z;
+            Parameters::castValue(x, shiftstrs[1], "Geometric3D::buildInparam");
+            Parameters::castValue(y, shiftstrs[2], "Geometric3D::buildInparam");
+            m->applyShift(x, y);
+        }
         models.push_back(m);
         
         // verbose
@@ -81,14 +101,4 @@ void Geometric3D::buildInparam(std::vector<Geometric3D *> &models,
             XMPI::cout << m->verbose();
         }
     }
-
-   for (int i = 0; i < Vol2GeomModels.size(); i++) {
-       Geometric3D *m = new Geometric3D_EMC();
-       m->initializeOcean(Vol2GeomModels[i]->mRLayer, Vol2GeomModels[i]->mRUpper, Vol2GeomModels[i]->mRLower,
-                          Vol2GeomModels[i]->mX, Vol2GeomModels[i]->mY, Vol2GeomModels[i]->mUndulation);
-       models.push_back(m);
-       if (verbose) {
-            XMPI::cout << m->verbose();
-       }
-   }
 }

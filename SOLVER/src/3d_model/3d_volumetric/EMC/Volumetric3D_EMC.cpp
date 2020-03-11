@@ -11,6 +11,7 @@
 #include "NetCDF_Reader.h"
 #include "NetCDF_ReaderAscii.h"
 
+#include "Geometric3D.h"
 #include <dirent.h>
 #include <sys/types.h>
 #include <boost/algorithm/string.hpp>
@@ -267,7 +268,7 @@ void Volumetric3D_EMC::setSourceLocation(double srcLat, double srcLon, double sr
     mSrcDep = srcDep;
 }
 
-bool Volumetric3D_EMC::get3dProperties(double r, double theta, double phi, double rElemCenter,
+bool Volumetric3D_EMC::get3dPropertiesInternal(double r, double theta, double phi, double rElemCenter,
     std::vector<MaterialProperty> &properties, 
     std::vector<MaterialRefType> &refTypes,
     std::vector<double> &values, bool isFluid) const {
@@ -281,8 +282,7 @@ bool Volumetric3D_EMC::get3dProperties(double r, double theta, double phi, doubl
     if (mCartesian) {
         RDCol3 rtpG;
         rtpG << r, theta, phi;
-        RDCol3 rtpS = Geodesy::rotateGlob2Src(rtpG, mSrcLat, mSrcLon, mSrcDep);
-        RDCol3 xyz = Geodesy::toCartesian(rtpS);
+        RDCol3 xyz = Geodesy::Glob2Cartesian(rtpG, mSrcLat, mSrcLon, mSrcDep);
         lat = xyz(0);
         lon = xyz(1);
         dep = Geodesy::getROuter() - xyz(2);
@@ -328,6 +328,7 @@ bool Volumetric3D_EMC::get3dProperties(double r, double theta, double phi, doubl
     }
     
     // interpolation
+    double tol = 0.01;
     int ldep0, llat0, llon0, ldep1, llat1, llon1;
     double wdep0, wlat0, wlon0, wdep1, wlat1, wlon1;
     if (mVerticalDiscontinuities) {
@@ -339,10 +340,10 @@ bool Volumetric3D_EMC::get3dProperties(double r, double theta, double phi, doubl
         // use point depth to determine value
         wdep0 = 1. - 1. / (mGridDep(ldep0 + 1) - mGridDep(ldep0)) * (dep - mGridDep(ldep0));
     } else {
-        XMath::interpLinear(dep, mGridDep, ldep0, wdep0);
+        XMath::interpLinearRobust(dep, mGridDep, ldep0, wdep0, tol);
     }
-    XMath::interpLinear(lat, mGridLat, llat0, wlat0);
-    XMath::interpLinear(lon, mGridLon, llon0, wlon0);    
+    XMath::interpLinearRobust(lat, mGridLat, llat0, wlat0, tol);
+    XMath::interpLinearRobust(lon, mGridLon, llon0, wlon0, tol);    
     if (ldep0 < 0 || llat0 < 0 || llon0 < 0) {
         return false;
     }
@@ -350,19 +351,147 @@ bool Volumetric3D_EMC::get3dProperties(double r, double theta, double phi, doubl
     ldep1 = ldep0 + 1;
     llat1 = llat0 + 1;
     llon1 = llon0 + 1;
-    wdep1 = 1. - wdep0;
-    wlat1 = 1. - wlat0;
-    wlon1 = 1. - wlon0;
+
+    std::vector<bool> use(8, true);
+    for (const auto &model: mDiscontinuities) {
+        model->handleDiscontinuities(r, theta, phi, mGeographic, mCartesian, rElemCenter, mGridLat(llat0), mGridLat(llat1), 
+        mGridLon(llon0), mGridLon(llon1), mGridDep(ldep0), mGridDep(ldep1), use, 0);
+    }
     
-    values[0] += mGridData[ldep0](llat0, llon0) * wdep0 * wlat0 * wlon0;
-    values[0] += mGridData[ldep0](llat1, llon0) * wdep0 * wlat1 * wlon0;
-    values[0] += mGridData[ldep0](llat0, llon1) * wdep0 * wlat0 * wlon1;
-    values[0] += mGridData[ldep0](llat1, llon1) * wdep0 * wlat1 * wlon1;
-    values[0] += mGridData[ldep1](llat0, llon0) * wdep1 * wlat0 * wlon0;
-    values[0] += mGridData[ldep1](llat1, llon0) * wdep1 * wlat1 * wlon0;
-    values[0] += mGridData[ldep1](llat0, llon1) * wdep1 * wlat0 * wlon1;
-    values[0] += mGridData[ldep1](llat1, llon1) * wdep1 * wlat1 * wlon1;
+    if (std::none_of(use.begin(), use.end(), [] (const bool &b) {return b;} )) {
+        throw std::runtime_error("Volumetric3D_EMC::get3dPropertiesInternal || "
+            "Point on wrong side of discontinuity.");
+    }
+    
+    RDColX weights = RDColX::Zero(8);
+    if (std::any_of(use.begin(), use.end(), [] (const bool &b) {return !b;} )) {
+        RDCol3 querycrd;
+        querycrd << lat, lon, dep;
+        if (!mCartesian) {
+            RDCol3 rtpG;
+            rtpG << r, theta, phi;
+            querycrd = Geodesy::Glob2Cartesian(rtpG, mSrcLat, mSrcLon, mSrcDep);
+            querycrd(2) = Geodesy::getROuter() - querycrd(2);
+        }
+        
+        std::vector<RDCol3> crds;
+        RDCol3 crd;
+        crd << mGridLat(llat0) , mGridLon(llon0) , mGridDep(ldep0);
+        crds.push_back(crd);
+        crd << mGridLat(llat1) , mGridLon(llon0) , mGridDep(ldep0);
+        crds.push_back(crd);
+        crd << mGridLat(llat0) , mGridLon(llon1) , mGridDep(ldep0);
+        crds.push_back(crd);
+        crd << mGridLat(llat1) , mGridLon(llon1) , mGridDep(ldep0);
+        crds.push_back(crd);
+        crd << mGridLat(llat0) , mGridLon(llon0) , mGridDep(ldep1);
+        crds.push_back(crd);
+        crd << mGridLat(llat1) , mGridLon(llon0) , mGridDep(ldep1);
+        crds.push_back(crd);
+        crd << mGridLat(llat0) , mGridLon(llon1) , mGridDep(ldep1);
+        crds.push_back(crd);
+        crd << mGridLat(llat1) , mGridLon(llon1) , mGridDep(ldep1);
+        crds.push_back(crd);
+        
+        for (int i = 0; i < 8; i++) {
+            if (!use[i]) continue;
+            RDCol3 crd = crds[i];
+            if (!mCartesian) {
+                crd(0) = Geodesy::lon2Phi(crd(0));
+                crd(1) = Geodesy::lat2Theta_d(crd(1), crd(2));
+                crd(2) = Geodesy::getROuter() - crd(2);
+                crd = Geodesy::Glob2Cartesian(crd, mSrcLat, mSrcLon, mSrcDep);
+                crd(2) = Geodesy::getROuter() - crd(2);
+            }
+            
+            RDCol3 squaredDistance = querycrd - crd;
+            squaredDistance = squaredDistance.array().pow(2);
+            double dist = sqrt(squaredDistance.sum());
+            if (dist < tinyDouble) {
+                weights = RDColX::Zero(0);
+                weights(i) = 1;
+                break;
+            } else {
+                weights(i) = 1 / dist;
+            }
+        }
+        double totalweight = weights.sum();
+        weights = weights.array() / totalweight;
+    } else {
+        wdep1 = 1. - wdep0;
+        wlat1 = 1. - wlat0;
+        wlon1 = 1. - wlon0;
+        
+        weights(0) = wdep0 * wlat0 * wlon0;
+        weights(1) = wdep0 * wlat1 * wlon0;
+        weights(2) = wdep0 * wlat0 * wlon1;
+        weights(3) = wdep0 * wlat1 * wlon1;
+        weights(4) = wdep1 * wlat0 * wlon0;
+        weights(5) = wdep1 * wlat1 * wlon0;
+        weights(6) = wdep1 * wlat0 * wlon1;
+        weights(7) = wdep1 * wlat1 * wlon1;
+    }
+    
+    values[0] += mGridData[ldep0](llat0, llon0) * weights(0);
+    values[0] += mGridData[ldep0](llat1, llon0) * weights(1);
+    values[0] += mGridData[ldep0](llat0, llon1) * weights(2);
+    values[0] += mGridData[ldep0](llat1, llon1) * weights(3);
+    values[0] += mGridData[ldep1](llat0, llon0) * weights(4);
+    values[0] += mGridData[ldep1](llat1, llon0) * weights(5);
+    values[0] += mGridData[ldep1](llat0, llon1) * weights(6);
+    values[0] += mGridData[ldep1](llat1, llon1) * weights(7);
+
     return true;
+}
+
+void Volumetric3D_EMC::findDiscontinuity(RDColX &lat, RDColX &lon, RDMatXX &depth, bool &cartesian, double val, 
+    double minDepth, double maxDepth, std::string &compType, bool from_bottom) const {
+    lat = mGridLat;
+    lon = mGridLon;
+    cartesian = mCartesian;
+
+    int z0 = 0;
+    int z1 = 0;
+    
+    if (mGridDep.maxCoeff() <= minDepth || mGridDep.minCoeff() >= maxDepth) {
+        throw std::runtime_error("Volumetric3D_EMC::findDiscontinuity || "
+            "Search range out of bounds of volumetric input model.");
+    }
+    
+    while (mGridDep(++z0) < minDepth);
+    z1 = z0;
+    while (mGridDep(z1++) < maxDepth);
+    
+    int dir = (compType.compare("greater") == 0) ? 1 : -1;
+
+    int dzi, zstart, zend;
+    if (!from_bottom) {
+        dzi = 1;
+        zstart = z0;
+        zend = z1;
+    } else {
+        dzi = -1;
+        zstart = z1;
+        zend = z0;
+    }
+
+    depth = RDMatXX::Zero(mGridLat.rows(), mGridLon.rows());
+    for (int yi = 0; yi < mGridLon.rows(); yi++) {
+        for (int xi = 0; xi < mGridLat.rows(); xi++) {
+            bool found = false;
+            for (int zi = z0; dzi * zi <= dzi * z1; zi += dzi) {
+                if (dir * mGridData[zi](xi,yi) > dir * val) {
+                    depth(xi,yi) = (mGridDep(zi - dzi) + mGridDep(zi)) / 2;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                throw std::runtime_error("Volumetric3D_EMC::findDiscontinuity || "
+                    "Discontinuity no found at " + boost::lexical_cast<std::string>(mGridLat(xi)) + " , " + boost::lexical_cast<std::string>(mGridLon(yi)) + ".");
+            }
+        }
+    }
 }
 
 std::string Volumetric3D_EMC::verbose() const {
@@ -400,6 +529,3 @@ std::string Volumetric3D_EMC::verbose() const {
     ss << "======================= 3D Volumetric =======================\n" << std::endl;
     return ss.str();
 }
-
-
-

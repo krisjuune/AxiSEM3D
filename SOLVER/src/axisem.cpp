@@ -8,7 +8,6 @@
 #include "XMPI.h"
 #include "eigenc.h"
 #include "eigenp.h"
-#include "WavefieldRecorder.h"
 
 int axisem_main(int argc, char *argv[]) {
     
@@ -54,10 +53,10 @@ int axisem_main(int argc, char *argv[]) {
         
         //////// 3D models 
         MultilevelTimer::begin("Build 3D Models", 0);
-        Volumetric3D::buildInparam(pl.mVolumetric3D, *(pl.mParameters), pl.mExodusModel,
-            pl.mVol2Geom3D, srcLat, srcLon, srcDep, verbose);
-        Geometric3D::buildInparam(pl.mGeometric3D, *(pl.mParameters), pl.mVol2Geom3D, srcLat, srcLon, srcDep, verbose);
+        Volumetric3D::buildInparam(pl.mVolumetric3D, *(pl.mParameters), pl.mExodusModel, srcLat, srcLon, srcDep, verbose);
+        Geometric3D::buildInparam(pl.mGeometric3D, *(pl.mParameters), srcLat, srcLon, srcDep, verbose);
         OceanLoad3D::buildInparam(pl.mOceanLoad3D, *(pl.mParameters), verbose);
+        DiscontinuityBuilder::buildInparam(pl.mVolumetric3D, pl.mGeometric3D, *(pl.mParameters), pl.mExodusModel, verbose);
         MultilevelTimer::end("Build 3D Models", 0);
         
         //////// mesh, phase 1
@@ -121,7 +120,7 @@ int axisem_main(int argc, char *argv[]) {
         MultilevelTimer::begin("Build Receivers", 0);
         ReceiverCollection::buildInparam(pl.mReceivers, *(pl.mParameters),
             srcLat, srcLon, srcDep, pl.mSTF->getSize(), verbose, pl.mExodusModel->isCartesian());
-        WavefieldRecorder::buildInparam(pl.mWFR, *(pl.mParameters));
+        WavefieldRecorder::buildInparam(sv.mWFR, *(pl.mParameters));
         MultilevelTimer::end("Build Receivers", 0);
 
         //////// computational domain
@@ -148,7 +147,7 @@ int axisem_main(int argc, char *argv[]) {
         MultilevelTimer::begin("Release Receivers", 1);
         pl.mReceivers->release(*(sv.mDomain), *(pl.mMesh), 
             pl.mParameters->getValue<bool>("OUT_STATIONS_DEPTH_REF"));
-        sv.mDomain->setWavefieldRecorder(pl.mWFR);
+        sv.mDomain->setWavefieldRecorder(sv.mWFR);
         MultilevelTimer::begin("Initialize Recorders", 2);
         sv.mDomain->initializeRecorders();
         MultilevelTimer::end("Initialize Recorders", 2);

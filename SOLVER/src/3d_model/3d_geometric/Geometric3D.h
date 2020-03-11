@@ -9,7 +9,6 @@
 #include <eigenp.h>
 
 class Parameters;
-class AutoGeometricParams;
 
 class Geometric3D {
 public:
@@ -19,8 +18,12 @@ public:
     // initialize internal variables if needed
     virtual void initialize() {};
     virtual void initialize(const std::vector<std::string> &params) {initialize();};
-    virtual void initializeOcean(double rLayer, double rUpper, double rLower, RDColX lat, RDColX lon, RDMatXX bathymetry) {};
+    virtual void initializeFromVolumetric(double rLayer, double rUpper, double rLower, RDColX lat, RDColX lon, RDMatXX bathymetry, bool cartesian) {};
     virtual void setSourceLocation(double srcLat, double srcLon, double srcDep) {};
+    virtual void applyShift(double x, double y) {};
+
+    virtual void handleDiscontinuities(double r, double theta, double phi, bool geographic, bool cartesian, double rElemCenter, double lat0, double lat1, 
+        double lon0, double lon1, double dep0, double dep1, std::vector<bool> &use, bool v) const {};
 
     // finalize internal variables if needed
     virtual void finalize() {};
@@ -40,8 +43,7 @@ public:
     
     // build from input parameters
     static void buildInparam(std::vector<Geometric3D *> &models,
-        const Parameters &par, std::vector<AutoGeometricParams *> Vol2GeomModels, 
-        double srcLat, double srcLon, double srcDep, int verbose);
+        const Parameters &par, double srcLat, double srcLon, double srcDep, int verbose);
 
 };
 

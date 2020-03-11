@@ -14,7 +14,7 @@ public:
     
     void finalize();
     
-    bool get3dProperties(double r, double theta, double phi, double rElemCenter,
+    bool get3dPropertiesInternal(double r, double theta, double phi, double rElemCenter,
         std::vector<MaterialProperty> &properties, 
         std::vector<MaterialRefType> &refTypes,
         std::vector<double> &values, bool isFluid) const;

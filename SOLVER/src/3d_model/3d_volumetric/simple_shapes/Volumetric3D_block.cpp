@@ -133,7 +133,7 @@ void Volumetric3D_block::initialize(const std::vector<std::string> &params) {
     }
 }
 
-bool Volumetric3D_block::get3dProperties(double r, double theta, double phi, double rElemCenter,
+bool Volumetric3D_block::get3dPropertiesInternal(double r, double theta, double phi, double rElemCenter,
     std::vector<MaterialProperty> &properties, 
     std::vector<MaterialRefType> &refTypes,
     std::vector<double> &values, bool isFluid) const {
