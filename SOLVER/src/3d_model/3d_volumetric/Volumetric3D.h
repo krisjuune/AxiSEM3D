@@ -6,10 +6,11 @@
 #pragma once
 #include <string>
 #include <vector>
+#include "eigenp.h"
 
 class Parameters;
 class ExodusModel;
-class AutoGeometricParams;
+class Geometric3D;
 
 class Volumetric3D {
 public:
@@ -70,16 +71,19 @@ public:
     // c) output: properties, refTypes, values
     // d) return: a "false" return means the outputs are all ignored, 
     //    e.g., the input location is out of the model range
-    virtual bool get3dProperties(double r, double theta, double phi, double rElemCenter,
+    bool get3dProperties(double r, double theta, double phi, double rElemCenter,
         std::vector<MaterialProperty> &properties, 
         std::vector<MaterialRefType> &refTypes,
-        std::vector<double> &values, bool isFluid) const = 0;
-
+        std::vector<double> &values, bool isFluid) const;
+        
     // verbose
     virtual std::string verbose() const = 0;
     
     // set source location, if needed
     virtual void setSourceLocation(double srcLat, double srcLon, double srcDep) {};
+    
+    // apply shift to the model wrt source location
+    virtual void applyShift(double x, double y, double z) {};
     
     // obtain additional mesh information from ExodusModel, if needed
     virtual void setupExodusModel(const ExodusModel *exModel) {};
@@ -87,12 +91,27 @@ public:
     // build from input parameters
     static void buildInparam(std::vector<Volumetric3D *> &models,
         const Parameters &par, const ExodusModel *exModel,
-        std::vector<AutoGeometricParams *> &Vol2GeoModels,
         double srcLat, double srcLon, double srcDep, int verbose);
         
     // some models may extent into the fluid core
     // but may not create 3D fluid actually
-    virtual bool makeFluid3D() const {return false;};    
-    virtual void modelBathymetry(std::vector<AutoGeometricParams *> &Vol2GeoModels) {};
-
+    virtual bool makeFluid3D() const {return false;};
+    
+    // for volumetric-geometric communication (discontinuities and flattening)
+    virtual bool isEMC() const {return false;};
+    virtual bool isCartesian() const {return false;};
+    virtual std::string getVarName() const {return "";};
+    virtual void findDiscontinuity(RDColX &lat, RDColX &lon, RDMatXX &depth, bool &cartesian, double val, 
+        double minDepth, double maxDepth, std::string &compType, bool from_bottom) const {};
+    virtual void getSourceLocation(double &srcLat, double &srcLon, double &srcDep) const {};
+    void setFlattening(const std::vector<Geometric3D *> flattening) {mFlattening = flattening;};
+    virtual void setDiscontinuities(const std::vector<Geometric3D *> discontinuities) {};
+    
+private:
+    virtual bool get3dPropertiesInternal(double r, double theta, double phi, double rElemCenter,
+        std::vector<MaterialProperty> &properties, 
+        std::vector<MaterialRefType> &refTypes,
+        std::vector<double> &values, bool isFluid) const = 0;
+    
+    std::vector<Geometric3D *> mFlattening;
 };

@@ -118,9 +118,6 @@ void Material::addVolumetric3D(const std::vector<Volumetric3D *> &m3D,
                                         &mC66_3D
     };
     
-    // radius at element center 
-    double rElemCenter = mMyQuad->computeCenterRadius();
-    
     // read 3D model
     int Nr = mMyQuad->getNr();
     for (int ipol = 0; ipol <= nPol; ipol++) {
@@ -140,6 +137,8 @@ void Material::addVolumetric3D(const std::vector<Volumetric3D *> &m3D,
                     std::vector<Volumetric3D::MaterialProperty> properties; 
                     std::vector<Volumetric3D::MaterialRefType> refTypes;
                     std::vector<double> values;
+                    
+                    double rElemCenter = mMyQuad->computeCenterRadius(model->isCartesian());
                     if (!model->get3dProperties(r, t, p, rElemCenter, properties, refTypes, values, mMyQuad->isFluid())) {
                         // point (r, t, p) not in model range
                         continue;
@@ -253,6 +252,16 @@ arPP_RDColX Material::computeElementalMass() const {
     return mass;
 }
 
+RDMatXN Material::getRho() const {
+    RDMatXN fluidK;
+    if (_3Dprepared()) {
+        fluidK = mRho3D.array().pow(-1.);    
+    } else {
+        fluidK = mRho3D.replicate(mMyQuad->getNr(), 1).array().pow(-1.);
+    }
+    return fluidK;
+}
+
 Acoustic *Material::createAcoustic(bool elem1D) const {
     const RDRowN &iFact = mMyQuad->getIntegralFactor();
     RDMatXN fluidK;
@@ -261,7 +270,6 @@ Acoustic *Material::createAcoustic(bool elem1D) const {
     } else {
         fluidK = mRho3D.replicate(mMyQuad->getNr(), 1).array().pow(-1.);
     }
-    RDMatXN FluidRho_pure = fluidK;
     
     for (int ipnt = 0; ipnt < nPntElem; ipnt++) {
        fluidK.col(ipnt) *= iFact(ipnt);
@@ -272,9 +280,9 @@ Acoustic *Material::createAcoustic(bool elem1D) const {
     if (elem1D) {
         RDMatPP kstruct;
         XMath::structuredUseFirstRow(fluidK, kstruct);
-        return new Acoustic1D(kstruct.cast<Real>(),FluidRho_pure.cast<Real>());
+        return new Acoustic1D(kstruct.cast<Real>());
     } else {
-        return new Acoustic3D(fluidK.cast<Real>(),FluidRho_pure.cast<Real>());
+        return new Acoustic3D(fluidK.cast<Real>());
     }
 }
 

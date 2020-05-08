@@ -209,7 +209,8 @@ void FluidPoint::gatherStiffFromElement(const vec_CMatPP &stiff, int ipol, int j
 
 void FluidPoint::addToStiff(const CMatX3 &source) {
     // make sure the length of "source" does not exceed mNu + 1
-    mStiff(0) -= source.sum();
+    int rows = std::min(mNu + 1, int(source.rows()));
+    mStiff.topRows(rows) -= source.col(0).topRows(rows);
 }
 
 void FluidPoint::maskField(CColX &field) {
@@ -223,7 +224,7 @@ void FluidPoint::maskField(CColX &field) {
         field(mNu) = czero;
     }
 }
-#include<iostream>
+
 void FluidPoint::learnWisdom(Real cutoff, int nPeaks) {
     // using only maximum of displacement
     if (nPeaks == 0) {

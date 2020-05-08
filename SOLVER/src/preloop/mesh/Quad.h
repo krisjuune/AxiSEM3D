@@ -8,6 +8,7 @@
 #include <vector>
 #include "eigenp.h"
 #include "Mapping.h"
+#include "Material.h"
 
 class ExodusModel;
 class NrField;
@@ -20,7 +21,6 @@ class GLLPoint;
 
 class Gradient;
 class Relabelling;
-class Material;
 class AttBuilder;
 class ABCParameters;
 
@@ -44,7 +44,7 @@ public:
     bool hasRelabelling() const;
     
     // get new deltaT
-    double getDeltaT() const;
+    double getDeltaT(bool isCartesian) const;
     
     // setup gll points 
     
@@ -72,7 +72,7 @@ public:
     RDMatX3 computeGeocentricGlobal(double srcLat, double srcLon, double srcDep,
         const RDCol2 &xieta, int npnt, double phi2D) const;
     RDMatX3 computeCartesian(const RDCol2 &xieta, int npnt, double phi2D) const;
-    double computeCenterRadius() const;
+    double computeCenterRadius(bool cartesian) const;
     
     // get properties
     int getQuadTag() const {return mQuadTag;};
@@ -90,12 +90,13 @@ public:
     const RDRowN &getIntegralFactor() const {return mIntegralFactor;};
     const Relabelling &getRelabelling() const {return *mRelabelling;};
     const RDMat24 &getNodalCoords() const {return mNodalCoords;};
+    RDMatXN getRho() const {return mMaterial->getRho();};
     
     // compute gradient of a scalar field
     void computeGradientScalar(const vec_CDMatPP &u, vec_ar3_CDMatPP &u_i) const;
     
     // get hmin on slices
-    RDColX getHminSlices() const;
+    RDColX getHminSlices(bool isCartesian) const;
     
     // get field variables for plots
     RDRowN getUndulationOnSlice(double phi) const;

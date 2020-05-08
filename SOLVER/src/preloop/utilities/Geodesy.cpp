@@ -145,6 +145,18 @@ RDCol3 Geodesy::rotateGlob2Src(const RDCol3 &rtpG, double srclat, double srclon,
     }
     return rtpS;
 }
+RDCol3 Geodesy::Cartesian2Glob(const RDCol3 &xyzS, double srclat, double srclon, double srcdep) {
+    const RDCol3 &xyzG = rotationMatrix(lat2Theta_d(srclat, srcdep), lon2Phi(srclon)) * xyzS;
+    bool defined = true;
+    RDCol3 rtpG = toSpherical(xyzG, defined);
+    return rtpG;
+}
+
+RDCol3 Geodesy::Glob2Cartesian(const RDCol3 &rtpG, double srclat, double srclon, double srcdep) {
+    const RDCol3 &xyzG = toCartesian(rtpG);
+    const RDCol3 &xyzS = rotationMatrix(lat2Theta_d(srclat, srcdep), lon2Phi(srclon)).transpose() * xyzG;
+    return xyzS;
+}
 
 double Geodesy::backAzimuth(double srclat, double srclon, double srcdep,
     double reclat, double reclon, double recdep) {    

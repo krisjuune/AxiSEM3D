@@ -11,7 +11,7 @@ class Acoustic1D: public Acoustic {
 public:
     // constructor
 
-    Acoustic1D(const RMatPP &KFluid, const RMatXN Rho): mKStruct(KFluid), mRho(Rho) {};
+    Acoustic1D(const RMatPP &KFluid): mKStruct(KFluid) {};
     // STEP 2: strain ==> stress
     void strainToStress(FluidResponse &response) const;
     
@@ -21,9 +21,6 @@ public:
     // 1D or Fourier space
     bool is1D() const {return true;};
 
-    RMatXN getRho() const {return mRho;};
-
 private:
     RMatPP mKStruct; // = integral factor / rho
-    RMatXN mRho; //  = 1 / rho
 };

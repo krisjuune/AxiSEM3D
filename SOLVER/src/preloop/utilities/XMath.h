@@ -21,6 +21,7 @@ public:
         
     // linear interpolation
     static void interpLinear(double target, const RDColX &bases, int &loc, double &weight); 
+    static void interpLinearRobust(double target, const RDColX &bases, int &loc, double &weight, double tol);
     
     // check sorted
     template<class TIN>

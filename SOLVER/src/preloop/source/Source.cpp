@@ -89,6 +89,10 @@ bool Source::locate(const Mesh &mesh, int &locTag, RDColP &interpFactZ, const Pa
         if(quad->isFluid() && !boost::iequals(src_type, "pressure_source")) {
             throw std::runtime_error("Source::locate || Only pressure sources permitted inside fluid media.");
         }
+        
+        if(!quad->isFluid() && boost::iequals(src_type, "pressure_source")) {
+            throw std::runtime_error("Source::locate || Pressure source not implemented for solids.");
+        }
 
         if (quad->invMapping(srcCrds, srcXiEta)) {
             if (std::abs(srcXiEta(1)) <= 1.000001) {

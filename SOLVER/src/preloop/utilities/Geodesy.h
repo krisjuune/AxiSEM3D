@@ -41,6 +41,9 @@ public:
     // globe to source-centered
     static RDCol3 rotateGlob2Src(const RDCol3 &rtpG, double srclat, double srclon, double srcdep);
     
+    static RDCol3 Cartesian2Glob(const RDCol3 &xyzS, double srclat, double srclon, double srcdep);
+    static RDCol3 Glob2Cartesian(const RDCol3 &rtpG, double srclat, double srclon, double srcdep);
+    
     // compute back azimuth (copied from specfem)
     static double backAzimuth(double srclat, double srclon, double srcdep,
                               double reclat, double reclon, double recdep);

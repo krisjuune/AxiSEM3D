@@ -432,7 +432,6 @@ void ExodusModel::formAuxiliary() {
     MultilevelTimer::begin("Process Exodus Solid-Fluid Boundary", 2);
     // find nodes which are part of both solid and fluid quads
     std::vector<bool> SFNode;
-    std::vector<double> SFdepth;
     for (int i = 0; i < getNumNodes(); i++) {
         int SumFluid = 0;
         for (int j = 0; j < refElem[i].size(); j++) {
@@ -440,13 +439,7 @@ void ExodusModel::formAuxiliary() {
         }
         
         SFNode.push_back(0 < SumFluid && SumFluid < refElem[i].size());
-        if (SFNode[i]) {
-            SFdepth.push_back(mNodalZ(i));
-        }
     }
-    // find highest SF boundary (assumed to be oceanfloor if surface quads are fluid)
-    SFdepth.push_back(mMeshedOceanDepth);
-    mMeshedOceanDepth = *std::max_element(SFdepth.begin(), SFdepth.end());
 
     // identify side of quads which is on SF boundary
     IColX SideSets_SF(getNumQuads());
@@ -868,10 +861,12 @@ void ExodusModel::buildInparam(ExodusModel *&exModel, const Parameters &par,
     exModel = new ExodusModel(exfile);
 
     exModel->mHasSpongeBoundary = par.getValue<bool>("ABC_SPONGE_BOUNDARIES");
+    exModel->mHasStaceyABC = par.getValue<bool>("ABC_STACEY_BOUNDARIES");
 
     if (exModel->mHasSpongeBoundary) {
         exModel->mHasMeshExtension = par.getValue<bool>("ABC_SPONGE_BOUNDARIES_EXTEND_MESH");
         exModel->mHasModelExtension = par.getValue<bool>("ABC_SPONGE_BOUNDARIES_EXTEND_MODEL");
+        exModel->mTSource = 2 * par.getValue<double>("SOURCE_STF_HALF_DURATION");
         
         std::string mstr = par.getValue<std::string>("ABC_SPONGE_BOUNDARIES_WIDTH");
         std::vector<std::string> strs = Parameters::splitString(mstr, "$");
@@ -887,9 +882,6 @@ void ExodusModel::buildInparam(ExodusModel *&exModel, const Parameters &par,
                 "Unknown ABC extension format " + format + ".");
         }
     }
-
-    exModel->mHasStaceyABC = par.getValue<bool>("ABC_STACEY_BOUNDARIES");
-    exModel->mTSource = 2 * par.getValue<double>("SOURCE_STF_HALF_DURATION");
 
     exModel->initialize();
     if (verbose) {
@@ -998,6 +990,79 @@ double ExodusModel::getElementalVariables(const std::string &varName, int quadTa
         int minIndex = 0;
         double min = diff.minCoeff(&minIndex);
         return mElementalVariables_axis.at(varName)(minIndex);
+    }
+}
+
+bool ExodusModel::findDiscontinuity(double &layer, const std::string &varName, double val, double upper, 
+    double lower, const std::string &compType, const bool from_bottom) const {
+
+    std::vector<double> z(mElementalVariableCoords_axis.data(), 
+                          mElementalVariableCoords_axis.data() + mElementalVariableCoords_axis.rows());
+    
+    auto it0 = std::upper_bound(z.begin(), z.end(), getROuter() - lower);
+    auto it1 = std::upper_bound(z.begin(), z.end(), getROuter() - upper);
+    
+    if (it0 == z.end() || it1 == z.begin()) {
+        throw std::runtime_error("ExodusModel::findDiscontinuity || Search range " 
+        + boost::lexical_cast<std::string>(getROuter() - lower) + " - " + boost::lexical_cast<std::string>(getROuter() - upper)
+        + " out of bounds of Exodus Model.");
+    }
+    
+    int i0 = it0 - z.begin();
+    int i1 = it1 - z.begin();
+    
+    RDColX vars = mElementalVariables_axis.at(varName).segment(i0, i1-i0);
+    if (compType.compare("less") == 0) {
+        vars *= -1;
+        val *= -1;
+    } else if (compType.compare("greater") != 0) {
+        throw std::runtime_error("ExodusModel::findDiscontinuity || Invalid comparison type. Permitted values are 'greater' and 'less'.");
+    }
+    
+    int idisc;
+    bool found;
+    if (from_bottom) {
+        for (int i = 0; i < vars.size(); i++) {
+            if (vars(i) > val) {
+                idisc = i;
+                found = true;
+                break;
+            }
+        }
+    } else {
+        for (int i = vars.size() - 1; i >= 0; i--) {
+            if (vars(i) > val) {
+                idisc = i;
+                found = true;
+                break;
+            }
+        }
+    }
+    
+    double z0 = z[i0 + idisc];
+    double z1 = z[i0 + idisc + 1];
+    
+    if (z1 - z0 < 2 * mDistTolerance + tinyDouble) {
+        layer = z0 + mDistTolerance;
+    } else {
+        layer = z0 - mDistTolerance;
+    }
+    
+    layer = getROuter() - layer;
+    return found;    
+}
+
+void ExodusModel::findClosestMeshLine(double &layer) const {
+    double zlayer = getROuter() - layer;
+    std::vector<double> z(mElementalVariableCoords_axis.data(), 
+                          mElementalVariableCoords_axis.data() + mElementalVariableCoords_axis.rows());
+                          
+    auto it = std::upper_bound(z.begin(), z.end(), zlayer);
+    
+    if (abs(*(it) - zlayer) < abs(*(it - 1) - zlayer)) {
+        layer = getROuter() - *(it);
+    } else {
+        layer = getROuter() - *(it - 1);
     }
 };
 

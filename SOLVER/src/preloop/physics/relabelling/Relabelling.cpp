@@ -35,23 +35,16 @@ void Relabelling::addUndulation(const std::vector<Geometric3D *> &g3D,
         return;
     }
 
-    RDCol2 szCenter = mMyQuad->mapping(RDCol2::Zero());
     int Nr = mMyQuad->getNr();
     for (int ipol = 0; ipol <= nPol; ipol++) {
         for (int jpol = 0; jpol <= nPol; jpol++) {
-
-            int ipnt = ipol * nPntEdge + jpol;
+            // geographic coordinates of cardinal points
             const RDCol2 &xieta = SpectralConstants::getXiEta(ipol, jpol, mMyQuad->isAxial());
+            RDMatX3 rtpS = mMyQuad->computeGeocentricGlobal(srcLat, srcLon, srcDep, xieta, Nr, phi2D);
+            
+            int ipnt = ipol * nPntEdge + jpol;
             for (const auto &model: g3D) {
-                RDMatX3 rtpS;
-                double rElemCenter;
-                if (model->isCartesian()) {
-                    rtpS = mMyQuad->computeCartesian(xieta, Nr, phi2D); // r s phi
-                    rElemCenter = szCenter(1);
-                } else {
-                    rtpS = mMyQuad->computeGeocentricGlobal(srcLat, srcLon, srcDep, xieta, Nr, phi2D);
-                    rElemCenter = szCenter.norm();
-                }
+                double rElemCenter = mMyQuad->computeCenterRadius(model->isCartesian());
                 for (int alpha = 0; alpha < Nr; alpha++) {
                     double r = rtpS(alpha, 0);
                     double t = rtpS(alpha, 1);
@@ -62,7 +55,7 @@ void Relabelling::addUndulation(const std::vector<Geometric3D *> &g3D,
         }
     }
     if (!isZero()) {
-        checkHmin();
+        checkHmin(0);
         formGradientUndulation();
         formMassUndulation();
     }
@@ -219,7 +212,7 @@ PRT *Relabelling::createPRT(bool elem1D) const {
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 
-void Relabelling::checkHmin() {
+void Relabelling::checkHmin(bool isCartesian) {
     int Nr = mMyQuad->getNr();
     int maxOrder = (Nr + 1) / 2 - 1;
     RDMatXN original = mStiff_dZ;
@@ -231,7 +224,7 @@ void Relabelling::checkHmin() {
             mStiff_dZ.col(ipnt) = data;
         }
         // compute hmin
-        const RDColX &hmin = mMyQuad->getHminSlices();
+        const RDColX &hmin = mMyQuad->getHminSlices(isCartesian);
         double hmin_all = XMath::trigonResampling(5 * Nr, hmin).minCoeff();
         if (hmin_all >= hmin.minCoeff() * .8) {
             // if (order >= 2) {

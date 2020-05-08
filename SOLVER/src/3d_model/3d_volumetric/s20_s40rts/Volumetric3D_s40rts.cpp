@@ -94,7 +94,7 @@ void Volumetric3D_s40rts::finalize() {
     __s40rts_MOD_finalize_s40rts();
 }
 
-bool Volumetric3D_s40rts::get3dProperties(double r, double theta, double phi, double rElemCenter,
+bool Volumetric3D_s40rts::get3dPropertiesInternal(double r, double theta, double phi, double rElemCenter,
     std::vector<MaterialProperty> &properties, 
     std::vector<MaterialRefType> &refTypes,
     std::vector<double> &values, bool isFluid) const {

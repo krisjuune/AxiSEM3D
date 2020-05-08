@@ -26,8 +26,12 @@ void Parameters::registerAll() {
     registerPar("MODEL_1D_EXODUS_MESH_FILE");
     registerPar("MODEL_3D_VOLUMETRIC_NUM");
     registerPar("MODEL_3D_VOLUMETRIC_LIST");
+    registerPar("MODEL_3D_VOLUMETRIC_SHIFT");
     registerPar("MODEL_3D_GEOMETRIC_NUM");
     registerPar("MODEL_3D_GEOMETRIC_LIST");
+    registerPar("MODEL_3D_GEOMETRIC_SHIFT");
+    registerPar("MODEL_3D_DISCONTINUITIES_NUM");
+    registerPar("MODEL_3D_DISCONTINUITIES_LIST");
     registerPar("MODEL_3D_ELLIPTICITY_MODE");
     registerPar("MODEL_3D_ELLIPTICITY_INVF");
     registerPar("MODEL_3D_OCEAN_LOAD");

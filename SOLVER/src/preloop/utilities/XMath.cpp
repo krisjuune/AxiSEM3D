@@ -62,6 +62,33 @@ void XMath::interpLinear(double target, const RDColX &bases, int &loc, double &w
     }
 }
 
+void XMath::interpLinearRobust(double target, const RDColX &bases, int &loc, double &weight, double tol) {
+    if (target + tol < bases(0) || target - tol > bases(bases.size() - 1)) {
+        loc = -1;
+        weight = 0.;
+        return;
+    }
+    // target smaller than bases but within tolerance
+    if (target < bases(0)) {
+        loc = 0;
+        weight = 1;
+        return;
+    }
+    
+    for (int i = 1; i < bases.size(); i++) {
+        if (target <= bases(i)) {
+            loc = i - 1;
+            weight = 1. - 1. / (bases(loc + 1) - bases(loc)) * (target - bases(loc));
+            return;
+        }
+    }
+    
+    // target larger than bases but within tolerance
+    loc = bases.size() - 2;
+    weight = 0;
+    return;
+}
+
 void XMath::checkLimits(double &value, double low, double up, double tol) {
     if (value < low + tol) {
         value = low + tol;

@@ -61,6 +61,7 @@ void Volumetric3D_bubble::initialize(const std::vector<std::string> &params) {
     try {
         int ipar = 7;
         Parameters::castValue(mSourceCentered, params.at(ipar++), source);
+        Parameters::castValue(mCartesian, params.at(ipar++), source);
         Parameters::castValue(mFluid, params.at(ipar++), source);
         Parameters::castValue(mHWHM, params.at(ipar++), source); mHWHM *= 1e3;
     } catch (std::out_of_range) {
@@ -69,7 +70,13 @@ void Volumetric3D_bubble::initialize(const std::vector<std::string> &params) {
     
     // compute xyz of endpoints and length
     RDCol3 rtpBubble;
-    if (mSourceCentered) {
+    if (mCartesian) {
+        RDCol3 xyz;
+        xyz(0) = mLat * 1000;
+        xyz(1) = mLon * 1000;
+        xyz(2) = Geodesy::getROuter() - mDepth;
+        rtpBubble = Geodesy::Cartesian2Glob(xyz, mSrcLat, mSrcLon, mSrcDep);
+    } else if (mSourceCentered) {
         RDCol3 rtpBubbleSrc;
         rtpBubbleSrc(0) = Geodesy::getROuter() - mDepth;
         rtpBubbleSrc(1) = mLat * degree;
@@ -96,7 +103,7 @@ void Volumetric3D_bubble::initialize(const std::vector<std::string> &params) {
     }
 }
 
-bool Volumetric3D_bubble::get3dProperties(double r, double theta, double phi, double rElemCenter,
+bool Volumetric3D_bubble::get3dPropertiesInternal(double r, double theta, double phi, double rElemCenter,
     std::vector<MaterialProperty> &properties, 
     std::vector<MaterialRefType> &refTypes,
     std::vector<double> &values, bool isFluid) const {
@@ -118,6 +125,8 @@ bool Volumetric3D_bubble::get3dProperties(double r, double theta, double phi, do
     distance -= mRadius; 
     if (distance < 0.) {
         distance = 0.;
+        values[0] = mValueInside;
+        return true;
     }
     
     // outside range

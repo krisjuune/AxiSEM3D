@@ -7,10 +7,9 @@
 
 #include "XMPI.h"
 #include "Parameters.h"
-#include "AutoGeometricParams.h"
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string.hpp>
-#include <iostream>
+#include "Geometric3D.h"
 
 /////////////////////////////// user-defined models here
 // #include "Volumetric3D_s20rts.h"
@@ -20,11 +19,10 @@
 #include "Volumetric3D_cylinder.h"
 #include "Volumetric3D_block.h"
 #include "Volumetric3D_EMC.h"
-#include "Volumetric3D_SEG.h"
 /////////////////////////////// user-defined models here
 
 void Volumetric3D::buildInparam(std::vector<Volumetric3D *> &models,
-    const Parameters &par, const ExodusModel *exModel, std::vector<AutoGeometricParams *> &Vol2GeoModels,
+    const Parameters &par, const ExodusModel *exModel,
     double srcLat, double srcLon, double srcDep, int verbose) {
     
     // clear the container
@@ -42,6 +40,8 @@ void Volumetric3D::buildInparam(std::vector<Volumetric3D *> &models,
             "MODEL_3D_VOLUMETRIC_NUM = " + boost::lexical_cast<std::string>(nmodels) + 
             ", but only " + boost::lexical_cast<std::string>(nsize) + " provided.");
     }
+    
+    int nShiftSize = par.getSize("MODEL_3D_VOLUMETRIC_SHIFT");
     
     for (int imodel = 0; imodel < nmodels; imodel++) {
         
@@ -71,8 +71,6 @@ void Volumetric3D::buildInparam(std::vector<Volumetric3D *> &models,
             m = new Volumetric3D_block();        
         } else if (boost::iequals(name, "emc")) {
             m = new Volumetric3D_EMC();
-        } else if (boost::iequals(name, "SEG_C3NA")) {
-            m = new Volumetric3D_SEG();
 
         ///////////////////////////////
         // user-defined models here
@@ -87,10 +85,28 @@ void Volumetric3D::buildInparam(std::vector<Volumetric3D *> &models,
         m->setSourceLocation(srcLat, srcLon, srcDep);
         m->setupExodusModel(exModel);
         m->initialize(params);
+        bool hasShift;
+        std::vector<std::string> shiftstrs;
+        if (imodel >= nShiftSize) {
+            hasShift = false;
+        } else {
+            std::string shiftstr = par.getValue<std::string>("MODEL_3D_VOLUMETRIC_SHIFT", imodel);
+            shiftstrs = Parameters::splitString(shiftstr, "$");
+            Parameters::castValue(hasShift, shiftstrs[0], "Volumetric3D::buildInparam");
+        }
+        
+        if (hasShift) {
+            if (!(shiftstrs.size() == 4)) {
+                throw std::runtime_error("Volumetric3D::buildInparam || "
+                    "3 coordinate values required for shifting 3D model.");
+            }
+            double x, y, z;
+            Parameters::castValue(x, shiftstrs[1], "Volumetric3D::buildInparam");
+            Parameters::castValue(y, shiftstrs[2], "Volumetric3D::buildInparam");
+            Parameters::castValue(z, shiftstrs[3], "Volumetric3D::buildInparam");
+            m->applyShift(x, y, z);
+        }
         models.push_back(m);
-
-        // SEG-model autogenerates ocean floor relabelling
-        m->modelBathymetry(Vol2GeoModels);
 
         // verbose
         if (verbose) {
@@ -98,3 +114,18 @@ void Volumetric3D::buildInparam(std::vector<Volumetric3D *> &models,
         }
     }
 }
+
+bool Volumetric3D::get3dProperties(double r, double theta, double phi, double rElemCenter,
+    std::vector<MaterialProperty> &properties, std::vector<MaterialRefType> &refTypes,
+    std::vector<double> &values, bool isFluid) const {
+    
+    double dr = 0;
+    double drc = 0;
+    for (const auto &model: mFlattening) {
+        dr += model->getDeltaR(r, theta, phi, rElemCenter);
+        drc += model->getDeltaR(rElemCenter, theta, phi, rElemCenter);
+    }
+
+    return get3dPropertiesInternal(r + dr, theta, phi, rElemCenter + drc, properties, refTypes, values, isFluid);
+}
+    
