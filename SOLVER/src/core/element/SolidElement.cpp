@@ -217,6 +217,9 @@ void SolidElement::computeGroundMotion(Real phi, const RMatPP &weights, RRow3 &u
 
 #include "SolverFFTW_N6.h"
 void SolidElement::computeStrain(Real phi, const RMatPP &weights, RRow6 &strain) const {
+    
+    throw std::runtime_error("SolidElement:computeStrain||not allowed");
+
     // setup static
     sResponse.setNr(mMaxNr);
     

@@ -13,8 +13,8 @@
 #include <iostream>
 
 /////////////////////////////// user-defined models here
-#include "Volumetric3D_s20rts.h"
-#include "Volumetric3D_s40rts.h"
+// #include "Volumetric3D_s20rts.h"
+// #include "Volumetric3D_s40rts.h"
 #include "Volumetric3D_crust1.h"
 #include "Volumetric3D_bubble.h"
 #include "Volumetric3D_cylinder.h"
@@ -54,9 +54,13 @@ void Volumetric3D::buildInparam(std::vector<Volumetric3D *> &models,
         // create model
         Volumetric3D *m;
         if (boost::iequals(name, "s20rts")) {
-            m = new Volumetric3D_s20rts();
+            // m = new Volumetric3D_s20rts();
+            throw std::runtime_error("Volumetric3D::buildInparam || "
+                "deprecated for mpif90 issue " + name + ".");
         } else if (boost::iequals(name, "s40rts")) {
-            m = new Volumetric3D_s40rts();
+            throw std::runtime_error("Volumetric3D::buildInparam || "
+                "deprecated for mpif90 issue " + name + ".");
+            // m = new Volumetric3D_s40rts();
         } else if (boost::iequals(name, "crust1")) {
             m = new Volumetric3D_crust1();
         } else if (boost::iequals(name, "bubble")) {

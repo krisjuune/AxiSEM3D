@@ -13,6 +13,7 @@
 #include "SpectralConstants.h"
 #include "XMPI.h"
 #include "MultilevelTimer.h"
+#include "Geodesy.h"
 
 #include "Parameters.h"
 #include <boost/algorithm/string.hpp>
@@ -64,7 +65,7 @@ void Source::release(Domain &domain, const Mesh &mesh, const Parameters &par) co
 bool Source::locate(const Mesh &mesh, int &locTag, RDColP &interpFactZ, const Parameters &par) const {
     MultilevelTimer::begin("R Source", 3);
     RDCol2 srcCrds = RDCol2::Zero();
-    srcCrds(1) = mesh.computeRadiusRef(mDepth, mLatitude, mLongitude);
+    srcCrds(1) = Geodesy::getROuter() - mDepth;
     MultilevelTimer::end("R Source", 3);
 
     // check range of subdomain

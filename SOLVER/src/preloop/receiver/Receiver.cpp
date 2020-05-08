@@ -69,7 +69,7 @@ bool Receiver::locate(const Mesh &mesh, int &elemTag, int &quadTag, bool depthIn
     recCrds(0) = r * sin(mTheta);
     recCrds(1) = r * cos(mTheta);
     if (cartesian) {
-        recCrds(1) = mesh.computeRadiusRef(mDepth, mLat, mLon);
+        recCrds(1) = r;
     }
     if (recCrds(0) > mesh.sMax() + tinySingle || recCrds(0) < mesh.sMin() - tinySingle) {
         return false;

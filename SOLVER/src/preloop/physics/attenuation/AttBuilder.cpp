@@ -2,7 +2,7 @@
 // created by Kuangdai on 8-Jun-2016 
 // compute attenuation parameters 
 
-#include "AttSimplex.h"
+// #include "AttSimplex.h"
 #include "AttAxiSEM.h"
 #include "Parameters.h"
 #include "XMPI.h"
@@ -179,7 +179,10 @@ void AttBuilder::buildInparam(AttBuilder *&attBuild, const Parameters &par,
             throw std::runtime_error("AttBuilder::buildInparam || "
                 "Number of SLSs can only be 3 when ATTENUATION_SPECFEM_LEGACY = true.");
         }
-        attBuild = new AttSimplex(cg4, attPar->mNSLS, attPar->mFmin, attPar->mFmax, attPar->mFref, dt);
+throw std::runtime_error("AttBuilder::buildInparam || "
+                "deprecated for mpif90 issue ");
+
+        // attBuild = new AttSimplex(cg4, attPar->mNSLS, attPar->mFmin, attPar->mFmax, attPar->mFref, dt);
     } else {
         attBuild = new AttAxiSEM(cg4, attPar->mNSLS, attPar->mFmin, attPar->mFmax, attPar->mFref, 
             attPar->mW, attPar->mY, dt, dokappa);
